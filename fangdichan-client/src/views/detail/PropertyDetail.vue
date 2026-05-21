@@ -35,7 +35,7 @@
       <el-button type="danger" @click="handleToggleFavorite">{{
         isFav ? '取消收藏' : '❤️ 收藏'
       }}</el-button>
-      <el-button type="primary" @click="createOrder">立即购买</el-button>
+      <el-button type="primary" @click="handleCreateOrder">立即购买</el-button>
       <el-button :loading="contacting" @click="contactAgent">联系房地产商</el-button>
       <el-button @click="$router.push('/report/' + property.id)">举报</el-button>
     </div>
@@ -49,6 +49,7 @@ import { ElMessage } from 'element-plus'
 import { getPropertyDetail } from '../../api/property'
 import { toggleFavorite, checkFavorite } from '../../api/favorite'
 import request from '../../api/request'
+import { createOrder } from '../../api/order'
 
 const route = useRoute()
 const router = useRouter()
@@ -94,13 +95,12 @@ const contactAgent = async () => {
   }
 }
 
-const createOrder = async () => {
-  const params = new URLSearchParams()
-  params.append('propertyId', route.params.id)
-  params.append('message', '我想购买')
-  await request.post('/customer/order', params, {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-  })
-  ElMessage.success('订单已提交')
+const handleCreateOrder = async () => {
+  try {
+    await createOrder(route.params.id, '我想购买')
+    ElMessage.success('订单已提交')
+  } catch {
+    ElMessage.error('订单提交失败')
+  }
 }
 </script>

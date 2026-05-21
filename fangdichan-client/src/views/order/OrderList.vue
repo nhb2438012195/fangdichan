@@ -12,7 +12,7 @@
             size="small"
             type="danger"
             :loading="cancellingId === row.id"
-            @click="cancelOrder(row.id)"
+            @click="handleCancelOrder(row.id)"
             >取消</el-button
           >
         </template>
@@ -30,7 +30,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { getOrderList, cancelOrder } from '../../api/order'
 
 const orders = ref([])
 const loading = ref(false)
@@ -39,8 +39,8 @@ const cancellingId = ref(null)
 const fetchOrders = async () => {
   loading.value = true
   try {
-    const res = await request.get('/customer/order/list', { params: { page: 1, size: 100 } })
-    orders.value = res.data.list || []
+    const data = await getOrderList({ page: 1, size: 100 })
+    orders.value = data.list || []
   } catch {
     orders.value = []
   } finally {
@@ -48,10 +48,10 @@ const fetchOrders = async () => {
   }
 }
 
-const cancelOrder = async (id) => {
+const handleCancelOrder = async (id) => {
   cancellingId.value = id
   try {
-    await request.put(`/customer/order/${id}/cancel`)
+    await cancelOrder(id)
     ElMessage.success('已取消')
     fetchOrders()
   } catch {

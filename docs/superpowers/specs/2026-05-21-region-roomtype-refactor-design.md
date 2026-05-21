@@ -77,7 +77,7 @@ CREATE TABLE room_type (
 | ~~district~~ | 删除 | 由 region_id 替代 |
 | ~~room_type~~ | 删除 | 由 room_type_id 替代 |
 | + region_id | 新增 BIGINT FK→region(id) | 关联到市/区级别 |
-| + province_id | 新增 BIGINT FK→region(id) | 省级冗余，创建时由 region_id 推导 |
+| + province_id | 新增 BIGINT FK→region(id) | 省级冗余，创建时由 region_id 自动推导 |
 | + room_type_id | 新增 BIGINT FK→room_type(id) | 关联户型表 |
 | location | 保留 | 存详细街道地址 |
 
@@ -97,6 +97,19 @@ ALTER TABLE property
     ADD FOREIGN KEY (province_id) REFERENCES region(id),
     ADD FOREIGN KEY (room_type_id) REFERENCES room_type(id);
 ```
+
+**province_id 自动推导规则（Service 层实现）：**
+
+创建或修改 property 时按以下逻辑填充 province_id：
+
+```
+if region.level == 2:
+    province_id = region.parent_id    // 市/区的上级就是省
+if region.level == 1 (不应发生):
+    province_id = region.id           // 防御性处理
+```
+
+具体在 `PropertyServiceImpl.createProperty()` 和 `updateProperty()` 中实现：从 region 表查出 region 的 parent_id 回填到 property.province_id。
 
 ### 1.4 customer_profile 表变更
 
@@ -157,7 +170,8 @@ RegionVO:
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/public/room-types` | 获取所有户型列表；可传 `?regionId=` 过滤该区域有房源的户型 |
-| GET | `/api/public/room-types/bedroom-counts` | 获取可选卧室数（用于前端下拉） |
+
+前端从返回列表中用 `new Set(list.map(r => r.bedroomCount))` 提取卧室数选项，无需独立端点。
 
 **返回格式：** `Result<List<RoomTypeVO>>`
 
@@ -185,21 +199,24 @@ GET /api/customer/property/search
   &regionId=          -- 省/市/区均可，后端自动判断层级
   &bedroomCount=      -- 卧室数筛选
   &livingRoomCount=   -- 客厅数筛选
-  &priceLevel=        -- 价格区间预设: none(不限)/lt100(100万以下)/100-200/200-300/300-500/gte500(500万以上)/custom(自定义)
-                       -- 价格区间映射:
-                       --   none    → 不筛选价格
-                       --   lt100   → priceMax < 1000000
-                       --   100-200 → priceMin >= 1000000 AND priceMax <= 2000000
-                       --   200-300 → priceMin >= 2000000 AND priceMax <= 3000000
-                       --   300-500 → priceMin >= 3000000 AND priceMax <= 5000000
-                       --   gte500  → priceMin >= 5000000
-                       --   custom  → 使用 priceMin/priceMax 参数（单位: 元）
-  &priceMin=          -- 自定义最低价（配合 priceLevel=custom 使用）
-  &priceMax=          -- 自定义最高价
+  &priceMin=          -- 最低价（单位: 元）
+  &priceMax=          -- 最高价（单位: 元）
   &areaMin=
   &areaMax=
   &page=&size=
 ```
+
+**价格前端转换规则：** 后端只接收 priceMin/priceMax（元），前端负责将用户选择的快捷价格区间转换为数值。映射如下：
+
+| 用户选择 | 前端发送 |
+|----------|----------|
+| 不限 | 不发送 priceMin/priceMax |
+| 100万以下 | priceMax=1000000 |
+| 100-200万 | priceMin=1000000, priceMax=2000000 |
+| 200-300万 | priceMin=2000000, priceMax=3000000 |
+| 300-500万 | priceMin=3000000, priceMax=5000000 |
+| 500万以上 | priceMin=5000000 |
+| 自定义 200万~800万 | priceMin=2000000, priceMax=8000000 |
 
 **搜索逻辑伪代码：**
 ```
@@ -330,7 +347,7 @@ GET /api/customer/property/recommended?page=&size=
 - 修改：Suggestion 实体
 - 修改：PropertyServiceImplTest 等单元测试
 - 新增：RegionServiceImplTest / RoomTypeServiceImplTest
-- 修改：DictController（可删除或改为调用新接口）
+- **删除：** `DictController.java` 和 PropertyMapper 中的 `selectDistinctDistricts()`/`selectDistinctRoomTypes()` — 旧字典接口被 Region/RoomType API 取代
 - 修改：init.sql（新增表 + 修改 property 表）
 
 ### 前端 client

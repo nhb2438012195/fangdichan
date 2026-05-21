@@ -31,7 +31,7 @@
         <el-form-item label="新密码"
           ><el-input v-model="pwdForm.newPassword" type="password"
         /></el-form-item>
-        <el-button type="primary" @click="changePassword">修改密码</el-button>
+        <el-button type="primary" @click="handleChangePassword">修改密码</el-button>
       </el-form>
     </el-card>
   </div>
@@ -40,7 +40,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { getProfile, updateProfile, changePassword } from '../../api/profile'
 
 const profile = ref({ realName: '', phone: '', email: '' })
 const intent = ref({ district: '', priceMin: null, priceMax: null, roomType: '' })
@@ -48,28 +48,28 @@ const pwdForm = ref({ oldPassword: '', newPassword: '' })
 
 onMounted(async () => {
   try {
-    const res = await request.get('/customer/profile')
-    profile.value = res.data || profile.value
+    const data = await getProfile()
+    if (data) profile.value = data
   } catch {
-    // keep default profile
+    // keep defaults
   }
 })
 
 const saveProfile = async () => {
-  await request.put('/customer/profile', profile.value)
+  await updateProfile(profile.value)
   ElMessage.success('保存成功')
 }
 
 const saveIntent = async () => {
-  await request.put('/customer/profile', {
+  await updateProfile({
     ...profile.value,
     buyIntent: JSON.stringify(intent.value)
   })
   ElMessage.success('意向已保存')
 }
 
-const changePassword = async () => {
-  await request.put('/customer/profile/password', null, { params: pwdForm.value })
+const handleChangePassword = async () => {
+  await changePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
   ElMessage.success('密码已修改')
   pwdForm.value = { oldPassword: '', newPassword: '' }
 }

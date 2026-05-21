@@ -33,9 +33,11 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../store/auth'
 
 const router = useRouter()
-const username = computed(() => localStorage.getItem('username') || '')
+const auth = useAuthStore()
+const username = computed(() => auth.username)
 
 const navItems = [
   { path: '/home', icon: '🏠', label: '首页' },
@@ -48,13 +50,13 @@ const navItems = [
 ]
 
 const minimize = () => {
-  if (window.electronAPI) window.electronAPI.minimize()
+  window.electronAPI?.minimize()
 }
 const toggleMaximize = () => {
-  if (window.electronAPI) window.electronAPI.toggleMaximize()
+  window.electronAPI?.toggleMaximize()
 }
 const close = () => {
-  if (window.electronAPI) window.electronAPI.close()
+  window.electronAPI?.close()
 }
 </script>
 

@@ -19,7 +19,8 @@ const routes = [
       { path: 'company/:id', component: () => import('../views/company/CompanyDetail.vue') },
       { path: 'profile', component: () => import('../views/profile/Profile.vue') },
       { path: 'suggestion', component: () => import('../views/suggestion/Suggestion.vue') },
-      { path: 'report/:propertyId', component: () => import('../views/report/ReportForm.vue') }
+      { path: 'report/:propertyId', component: () => import('../views/report/ReportForm.vue') },
+      { path: '/:pathMatch(.*)*', redirect: '/home' }
     ]
   }
 ]

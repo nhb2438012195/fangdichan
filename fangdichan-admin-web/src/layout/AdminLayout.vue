@@ -9,15 +9,15 @@
         active-text-color="#409EFF"
       >
         <el-menu-item index="/dashboard">📊 仪表盘</el-menu-item>
-        <el-menu-item v-if="role === 'ADMIN'" index="/user">👥 用户管理</el-menu-item>
-        <el-menu-item v-if="role === 'AGENT'" index="/company">🏢 公司信息</el-menu-item>
-        <el-menu-item v-if="role === 'AGENT'" index="/property">🏠 房源管理</el-menu-item>
-        <el-menu-item v-if="role === 'ADMIN'" index="/audit">📋 审核管理</el-menu-item>
-        <el-menu-item v-if="role === 'AGENT'" index="/order">📦 订单管理</el-menu-item>
-        <el-menu-item v-if="role === 'AGENT'" index="/analysis">📈 关联分析</el-menu-item>
-        <el-menu-item v-if="role === 'ADMIN'" index="/report-handle">⚠️ 举报处理</el-menu-item>
+        <el-menu-item v-if="auth.role === 'ADMIN'" index="/user">👥 用户管理</el-menu-item>
+        <el-menu-item v-if="auth.role === 'AGENT'" index="/company">🏢 公司信息</el-menu-item>
+        <el-menu-item v-if="auth.role === 'AGENT'" index="/property">🏠 房源管理</el-menu-item>
+        <el-menu-item v-if="auth.role === 'ADMIN'" index="/audit">📋 审核管理</el-menu-item>
+        <el-menu-item v-if="auth.role === 'AGENT'" index="/order">📦 订单管理</el-menu-item>
+        <el-menu-item v-if="auth.role === 'AGENT'" index="/analysis">📈 关联分析</el-menu-item>
+        <el-menu-item v-if="auth.role === 'ADMIN'" index="/report-handle">⚠️ 举报处理</el-menu-item>
         <el-menu-item index="/message">💬 消息</el-menu-item>
-        <el-menu-item v-if="role === 'ADMIN'" index="/config">⚙️ 系统配置</el-menu-item>
+        <el-menu-item v-if="auth.role === 'ADMIN'" index="/config">⚙️ 系统配置</el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
@@ -33,7 +33,7 @@
         <span>购房通管理后台</span>
         <div>
           <span style="margin-right: 16px">{{
-            role === 'ADMIN' ? '管理员' : role === 'AGENT' ? '房地产商' : '客户'
+            auth.role === 'ADMIN' ? '管理员' : auth.role === 'AGENT' ? '房地产商' : '客户'
           }}</span>
           <el-button size="small" @click="handleLogout">退出</el-button>
         </div>
@@ -49,7 +49,6 @@ import { useAuthStore } from '../store/auth'
 
 const router = useRouter()
 const auth = useAuthStore()
-const { role } = useAuthStore()
 
 const handleLogout = () => {
   auth.logout()

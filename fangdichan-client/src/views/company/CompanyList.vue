@@ -18,7 +18,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import request from '../../api/request'
+import { getCompanyList } from '../../api/company'
 
 const companies = ref([])
 const loading = ref(false)
@@ -26,8 +26,7 @@ const loading = ref(false)
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await request.get('/customer/company/list')
-    companies.value = res.data || []
+    companies.value = await getCompanyList()
   } catch {
     companies.value = []
   } finally {

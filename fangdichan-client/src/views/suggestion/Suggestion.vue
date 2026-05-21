@@ -29,7 +29,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { submitSuggestion } from '../../api/suggestion'
+import { getCompanyList } from '../../api/company'
 
 const formRef = ref(null)
 const submitting = ref(false)
@@ -49,8 +50,7 @@ const rules = {
 
 onMounted(async () => {
   try {
-    const res = await request.get('/customer/company/list')
-    companies.value = res.data || []
+    companies.value = await getCompanyList()
   } catch {
     companies.value = []
   }
@@ -58,16 +58,14 @@ onMounted(async () => {
 
 const submit = async () => {
   if (!formRef.value) return
-  await formRef.value.validate()
+  try {
+    await formRef.value.validate()
+  } catch {
+    return
+  }
   submitting.value = true
   try {
-    const params = new URLSearchParams()
-    Object.entries(form.value).forEach(([k, v]) => {
-      if (v !== null && v !== '') params.append(k, v)
-    })
-    await request.post('/customer/suggestion', params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    })
+    await submitSuggestion(form.value)
     ElMessage.success('建议已提交')
     form.value = {
       companyId: '',
@@ -77,7 +75,7 @@ const submit = async () => {
       content: ''
     }
   } catch {
-    if (e?.response) ElMessage.error('提交失败')
+    // error handled by interceptor
   } finally {
     submitting.value = false
   }

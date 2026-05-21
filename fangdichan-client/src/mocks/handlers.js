@@ -102,6 +102,48 @@ export const handlers = [
     })
   }),
 
+  // Customer: company list
+  http.get(`${BASE}/customer/company/list`, () => {
+    return HttpResponse.json({
+      code: 200,
+      msg: 'success',
+      data: [
+        {
+          id: 1,
+          companyName: '测试房产公司',
+          address: '北京市朝阳区',
+          contactPhone: '13800000000',
+          description: '专业房产中介'
+        }
+      ]
+    })
+  }),
+
+  // Customer: company detail
+  http.get(`${BASE}/customer/company/:id`, ({ params }) => {
+    return HttpResponse.json({
+      code: 200,
+      msg: 'success',
+      data: {
+        id: parseInt(params.id),
+        companyName: '测试房产公司',
+        address: '北京市朝阳区',
+        contactPhone: '13800000000',
+        description: '专业房产中介'
+      }
+    })
+  }),
+
+  // Customer: suggestion
+  http.post(`${BASE}/customer/suggestion`, () => {
+    return HttpResponse.json({ code: 200, msg: 'success', data: { id: 1, msg: '提交成功' } })
+  }),
+
+  // Customer: report
+  http.post(`${BASE}/customer/report`, () => {
+    return HttpResponse.json({ code: 200, msg: 'success', data: { id: 1, msg: '举报成功' } })
+  }),
+
   // Customer: favorite list
   http.get(`${BASE}/customer/favorite/list`, () => {
     return HttpResponse.json({

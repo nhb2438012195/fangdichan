@@ -14,7 +14,7 @@
 import { ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { submitReport } from '../../api/report'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,19 +25,18 @@ const rules = { reason: [{ required: true, message: '请输入举报原因', tri
 
 const submit = async () => {
   if (!formRef.value) return
-  await formRef.value.validate()
+  try {
+    await formRef.value.validate()
+  } catch {
+    return
+  }
   submitting.value = true
   try {
-    const params = new URLSearchParams()
-    params.append('propertyId', route.params.propertyId)
-    params.append('reason', form.reason)
-    await request.post('/customer/report', params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    })
+    await submitReport(route.params.propertyId, form.reason)
     ElMessage.success('举报已提交')
     router.push('/home')
   } catch {
-    if (e?.response) ElMessage.error('提交失败')
+    // error handled by interceptor
   } finally {
     submitting.value = false
   }

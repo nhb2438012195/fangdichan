@@ -27,7 +27,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import request from '../../api/request'
+import { getCompanyDetail } from '../../api/company'
+import { searchProperties } from '../../api/property'
 
 const route = useRoute()
 const company = ref(null)
@@ -37,14 +38,12 @@ const loading = ref(true)
 onMounted(async () => {
   loading.value = true
   try {
-    const [res, res2] = await Promise.all([
-      request.get(`/customer/company/${route.params.id}`),
-      request.get('/customer/property/search', {
-        params: { companyId: route.params.id, page: 1, size: 100 }
-      })
+    const [companyData, searchData] = await Promise.all([
+      getCompanyDetail(route.params.id),
+      searchProperties({ companyId: route.params.id, page: 1, size: 100 })
     ])
-    company.value = res.data
-    properties.value = res2.data.list || []
+    company.value = companyData
+    properties.value = searchData.list || []
   } catch {
     company.value = null
   } finally {

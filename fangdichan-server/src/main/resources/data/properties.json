@@ -1,0 +1,11 @@
+[
+  {"title":"朝阳区精装三居室","location":"朝阳区建国路88号","regionName":"朝阳区","provinceName":"北京市","roomTypeDisplayName":"三室两厅","area":120,"price":5000000,"isVacant":true,"status":"APPROVED"},
+  {"title":"海淀区学区两居室","location":"海淀区中关村大街1号","regionName":"海淀区","provinceName":"北京市","roomTypeDisplayName":"两室一厅","area":85,"price":3500000,"isVacant":true,"status":"APPROVED"},
+  {"title":"东城区精装一居室","location":"东城区王府井大街10号","regionName":"东城区","provinceName":"北京市","roomTypeDisplayName":"一室一厅","area":50,"price":2800000,"isVacant":false,"status":"APPROVED"},
+  {"title":"西城区大平层","location":"西城区金融街5号","regionName":"西城区","provinceName":"北京市","roomTypeDisplayName":"四室两厅","area":200,"price":12000000,"isVacant":true,"status":"APPROVED"},
+  {"title":"丰台区花园洋房","location":"丰台区科技园南路","regionName":"丰台区","provinceName":"北京市","roomTypeDisplayName":"三室两厅","area":135,"price":6200000,"isVacant":true,"status":"APPROVED"},
+  {"title":"浦东新区江景房","location":"浦东新区陆家嘴路1号","regionName":"浦东新区","provinceName":"上海市","roomTypeDisplayName":"三室两厅","area":150,"price":8000000,"isVacant":true,"status":"APPROVED"},
+  {"title":"广州市天河区住宅","location":"天河区天河路100号","regionName":"广州市","provinceName":"广东省","roomTypeDisplayName":"三室两厅","area":110,"price":4000000,"isVacant":true,"status":"APPROVED"},
+  {"title":"深圳市南山区科技园住宅","location":"南山区科技园南路","regionName":"深圳市","provinceName":"广东省","roomTypeDisplayName":"三室两厅","area":95,"price":6000000,"isVacant":true,"status":"APPROVED"},
+  {"title":"杭州市西湖区景观房","location":"西湖区龙井路1号","regionName":"杭州市","provinceName":"浙江省","roomTypeDisplayName":"三室两厅","area":120,"price":4500000,"isVacant":true,"status":"APPROVED"}
+]

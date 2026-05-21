@@ -78,7 +78,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import request from '../../api/request'
+import { searchProperties } from '../../api/property'
 import { DISTRICTS, ROOM_TYPES } from '../../constants'
 
 const route = useRoute()
@@ -113,16 +113,16 @@ function cleanParams(params) {
 
 const search = async () => {
   page.value = 1
-  loadPage()
+  await loadPage()
 }
 
 const loadPage = async () => {
   loading.value = true
   try {
     const params = cleanParams({ ...filters.value, page: page.value, size: 10 })
-    const res = await request.get('/customer/property/search', { params })
-    list.value = res.data.list || []
-    total.value = res.data.total || 0
+    const data = await searchProperties(params)
+    list.value = data.list || []
+    total.value = data.total || 0
   } catch {
     list.value = []
     total.value = 0

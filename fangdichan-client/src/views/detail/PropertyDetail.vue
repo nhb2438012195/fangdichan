@@ -46,6 +46,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getPropertyDetail } from '../../api/property'
 import request from '../../api/request'
 
 const route = useRoute()
@@ -55,8 +56,8 @@ const isFav = ref(false)
 const contacting = ref(false)
 
 onMounted(async () => {
-  const res = await request.get(`/customer/property/${route.params.id}`)
-  property.value = res.data
+  const data = await getPropertyDetail(route.params.id)
+  property.value = data
   try {
     const favRes = await request.get(`/customer/favorite/check/${route.params.id}`)
     isFav.value = favRes.data

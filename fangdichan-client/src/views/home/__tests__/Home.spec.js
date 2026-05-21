@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 
-// Mock vue-router completely
+// Mock vue-router completely to avoid router initialization issues
 vi.mock('vue-router', () => {
   const mockPush = vi.fn()
   return {
@@ -16,6 +16,7 @@ vi.mock('vue-router', () => {
 
 // Mock the property API module
 vi.mock('../../../api/property', () => ({
+  getRecommended: vi.fn(),
   searchProperties: vi.fn()
 }))
 
@@ -26,45 +27,44 @@ vi.mock('element-plus', () => ({
   default: { install: vi.fn() }
 }))
 
-import { searchProperties } from '../../../api/property'
-import SearchVue from '../Search.vue'
+import { getRecommended, searchProperties } from '../../../api/property'
+import HomeVue from '../Home.vue'
 
-describe('Search.vue - property API integration', () => {
+describe('Home.vue - property API integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    searchProperties.mockResolvedValue({ list: [], total: 0, page: 1, size: 10 })
+    getRecommended.mockResolvedValue({ list: [], total: 0, page: 1, size: 10 })
   })
 
-  it('should call searchProperties on mount with default params', async () => {
-    searchProperties.mockResolvedValue({
+  it('should call getRecommended on mount', async () => {
+    const mockData = {
       list: [
         {
           id: 1,
           title: '朝阳区精装三居室',
           price: 5000000,
           area: 120,
-          district: '朝阳区',
           roomType: '三室两厅',
-          location: '朝阳路100号'
+          floor: 7
         }
       ],
       total: 1,
       page: 1,
       size: 10
-    })
+    }
+    getRecommended.mockResolvedValue(mockData)
 
-    shallowMount(SearchVue, {
+    shallowMount(HomeVue, {
       global: {
         stubs: [
           'el-input',
           'el-button',
+          'el-tag',
           'el-card',
+          'el-dialog',
           'el-select',
           'el-option',
           'el-input-number',
-          'el-pagination',
-          'el-form-item',
-          'el-form',
           'router-link'
         ]
       }
@@ -72,54 +72,43 @@ describe('Search.vue - property API integration', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 50))
 
-    expect(searchProperties).toHaveBeenCalledTimes(1)
-    expect(searchProperties).toHaveBeenCalledWith({
-      page: 1,
-      size: 10
-    })
+    expect(getRecommended).toHaveBeenCalledTimes(1)
   })
 
-  it('should call searchProperties with filters when search button is clicked', async () => {
-    const wrapper = shallowMount(SearchVue, {
+  it('should call searchProperties when guide nextStep reaches step 3', async () => {
+    const mockData = {
+      list: [{ id: 2, title: '海淀区学区两居室', price: 3500000 }],
+      total: 1,
+      page: 1,
+      size: 10
+    }
+    searchProperties.mockResolvedValue(mockData)
+
+    const wrapper = shallowMount(HomeVue, {
       global: {
         stubs: [
           'el-input',
           'el-button',
+          'el-tag',
           'el-card',
+          'el-dialog',
           'el-select',
           'el-option',
           'el-input-number',
-          'el-pagination',
-          'el-form-item',
-          'el-form',
           'router-link'
         ]
       }
     })
 
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    searchProperties.mockClear()
-
-    // Set filters and call search
-    wrapper.vm.filters = {
-      district: '朝阳区',
-      roomType: '三室两厅',
-      priceMin: 3000000,
-      priceMax: 8000000,
-      keyword: '',
-      areaMin: null,
-      areaMax: null
-    }
-    wrapper.vm.search()
+    wrapper.vm.guideForm = { district: '朝阳区', priceMin: null, priceMax: null, roomType: '' }
+    wrapper.vm.guideStep = 3
+    wrapper.vm.nextGuide()
 
     await new Promise((resolve) => setTimeout(resolve, 50))
 
     expect(searchProperties).toHaveBeenCalledTimes(1)
     expect(searchProperties).toHaveBeenCalledWith({
       district: '朝阳区',
-      roomType: '三室两厅',
-      priceMin: 3000000,
-      priceMax: 8000000,
       page: 1,
       size: 10
     })

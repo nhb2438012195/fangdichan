@@ -104,7 +104,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import request from '../../api/request'
+import { getRecommended, searchProperties } from '../../api/property'
 import { DISTRICTS, ROOM_TYPES } from '../../constants'
 
 const router = useRouter()
@@ -123,8 +123,8 @@ const quickTags = ['两室', '三室', '朝阳区', '海淀区']
 const fetchRecommended = async () => {
   loading.value = true
   try {
-    const res = await request.get('/customer/property/recommended')
-    properties.value = res.data.list || []
+    const data = await getRecommended()
+    properties.value = data.list || []
   } catch {
     properties.value = []
   } finally {
@@ -160,10 +160,9 @@ const nextGuide = () => {
         ([, v]) => v !== null && v !== undefined && v !== ''
       )
     )
-    request
-      .get('/customer/property/search', { params })
-      .then((res) => {
-        guideResults.value = res.data.list || []
+    searchProperties(params)
+      .then((data) => {
+        guideResults.value = data.list || []
         guideStep.value++
       })
       .catch(() => {

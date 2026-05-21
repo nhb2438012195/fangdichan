@@ -36,7 +36,7 @@
         isFav ? '取消收藏' : '❤️ 收藏'
       }}</el-button>
       <el-button type="primary" @click="handleCreateOrder">立即购买</el-button>
-      <el-button :loading="contacting" @click="contactAgent">联系房地产商</el-button>
+      <el-button :loading="contacting" @click="handleContactAgent">联系房地产商</el-button>
       <el-button @click="$router.push('/report/' + property.id)">举报</el-button>
     </div>
   </div>
@@ -48,7 +48,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getPropertyDetail } from '../../api/property'
 import { toggleFavorite, checkFavorite } from '../../api/favorite'
-import request from '../../api/request'
+import { createConversation } from '../../api/message'
 import { createOrder } from '../../api/order'
 
 const route = useRoute()
@@ -77,17 +77,15 @@ const handleToggleFavorite = async () => {
   }
 }
 
-const contactAgent = async () => {
+const handleContactAgent = async () => {
   if (!property.value?.companyId) {
     ElMessage.warning('该房源暂无关联房地产商')
     return
   }
   contacting.value = true
   try {
-    const res = await request.post('/customer/conversation', null, {
-      params: { companyId: property.value.companyId, propertyId: property.value.id }
-    })
-    router.push(`/message?conversationId=${res.data.id}`)
+    const data = await createConversation(property.value.companyId, property.value.id)
+    router.push(`/message?conversationId=${data.id}`)
   } catch {
     ElMessage.error('创建会话失败')
   } finally {

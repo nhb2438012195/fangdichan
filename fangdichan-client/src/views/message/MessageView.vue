@@ -33,9 +33,9 @@
           v-model="newMsg"
           placeholder="输入消息"
           style="margin-right: 8px"
-          @keyup.enter="sendMessage"
+          @keyup.enter="handleSendMessage"
         />
-        <el-button type="primary" :loading="sending" @click="sendMessage">发送</el-button>
+        <el-button type="primary" :loading="sending" @click="handleSendMessage">发送</el-button>
       </div>
     </div>
   </div>
@@ -44,7 +44,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import request from '../../api/request'
+import { getConversationList, getMessages, sendMessage } from '../../api/message'
 
 const route = useRoute()
 const conversations = ref([])
@@ -58,9 +58,8 @@ let reconnectTimer = null
 let reconnectAttempts = 0
 
 const fetchConversations = async () => {
-  const res = await request.get('/customer/conversation/list')
-  conversations.value = res.data.list || res.data
-  // Auto-select conversation if conversationId is in URL
+  const data = await getConversationList()
+  conversations.value = data.list || data
   const targetId = route.query.conversationId
   if (targetId) {
     const target = conversations.value.find((c) => c.id === Number(targetId))
@@ -75,8 +74,7 @@ const selectConversation = async (c) => {
   selected.value = c
   loadingMessages.value = true
   try {
-    const res = await request.get(`/customer/conversation/${c.id}/messages`)
-    messages.value = res.data
+    messages.value = await getMessages(c.id)
   } catch {
     messages.value = []
   } finally {
@@ -84,19 +82,19 @@ const selectConversation = async (c) => {
   }
 }
 
-const sendMessage = async () => {
-  if (!newMsg.value.trim()) return
+const handleSendMessage = async () => {
+  if (!newMsg.value.trim() || !selected.value) return
   const content = newMsg.value
   sending.value = true
   try {
-    await request.post(`/customer/conversation/${selected.value.id}/message`, { content })
+    await sendMessage(selected.value.id, content)
     messages.value.push({ content, senderRole: 'CUSTOMER', id: Date.now() })
     newMsg.value = ''
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ conversationId: selected.value.id, content }))
     }
   } catch {
-    // message send failed, will be shown via ElMessage from interceptor
+    // error handled by interceptor
   } finally {
     sending.value = false
   }
@@ -106,8 +104,7 @@ const connectWs = () => {
   const token = localStorage.getItem('token')
   if (!token) return
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const host = window.location.host
-  ws = new WebSocket(`${protocol}//${host}/ws?token=${token}`)
+  ws = new WebSocket(`${protocol}//${window.location.host}/ws?token=${token}`)
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data)

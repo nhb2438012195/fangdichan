@@ -113,7 +113,7 @@ class PropertyServiceImplTest {
             return pg;
         });
 
-        PageResult<Property> result = propertyService.search("朝阳", null, null, null, null, null, null, 1, 10);
+        PageResult<Property> result = propertyService.search("朝阳", null, null, null, null, null, null, null, 1, 10);
         assertEquals(1, result.getList().size());
     }
 

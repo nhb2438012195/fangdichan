@@ -22,7 +22,6 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../store/auth'
-import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -35,7 +34,7 @@ const handleLogin = async () => {
     await auth.login(form.username, form.password)
     router.push('/home')
   } catch {
-    ElMessage.error(e.response?.data?.msg || '登录失败')
+    // error handled by interceptor
   } finally {
     loading.value = false
   }

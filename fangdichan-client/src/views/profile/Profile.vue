@@ -3,10 +3,12 @@
     <h3>个人中心</h3>
     <el-card style="margin-bottom: 16px">
       <h4>个人信息</h4>
-      <el-form :model="profile" label-width="100px">
-        <el-form-item label="姓名"><el-input v-model="profile.realName" /></el-form-item>
-        <el-form-item label="电话"><el-input v-model="profile.phone" /></el-form-item>
-        <el-form-item label="邮箱"><el-input v-model="profile.email" /></el-form-item>
+      <el-form :model="profile" label-width="100px" :rules="profileRules">
+        <el-form-item label="姓名" prop="realName"
+          ><el-input v-model="profile.realName"
+        /></el-form-item>
+        <el-form-item label="电话" prop="phone"><el-input v-model="profile.phone" /></el-form-item>
+        <el-form-item label="邮箱" prop="email"><el-input v-model="profile.email" /></el-form-item>
         <el-button type="primary" @click="saveProfile">保存</el-button>
       </el-form>
     </el-card>
@@ -43,6 +45,12 @@ import { ElMessage } from 'element-plus'
 import { getProfile, updateProfile, changePassword } from '../../api/profile'
 
 const profile = ref({ realName: '', phone: '', email: '' })
+
+const profileRules = {
+  realName: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  phone: [{ pattern: /^1[3-9]\d{9}$/, message: '请输入正确手机号', trigger: 'blur' }],
+  email: [{ type: 'email', message: '请输入正确邮箱', trigger: 'blur' }]
+}
 const intent = ref({ district: '', priceMin: null, priceMax: null, roomType: '' })
 const pwdForm = ref({ oldPassword: '', newPassword: '' })
 

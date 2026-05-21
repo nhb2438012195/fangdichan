@@ -19,17 +19,21 @@
     </el-table>
 
     <el-dialog v-model="showDialog" :title="editingId ? '编辑房源' : '发布房源'" width="600px">
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
-        <el-form-item label="区域"><el-input v-model="form.district" /></el-form-item>
+      <el-form :model="form" label-width="100px" :rules="formRules">
+        <el-form-item label="标题" prop="title"><el-input v-model="form.title" /></el-form-item>
+        <el-form-item label="区域" prop="district"
+          ><el-input v-model="form.district"
+        /></el-form-item>
         <el-form-item label="地址"><el-input v-model="form.location" /></el-form-item>
         <el-form-item label="楼层区间"><el-input v-model="form.floor" /></el-form-item>
         <el-form-item label="总楼层"
           ><el-input v-model="form.floorTotal" type="number"
         /></el-form-item>
         <el-form-item label="户型"><el-input v-model="form.roomType" /></el-form-item>
-        <el-form-item label="面积(㎡)"><el-input v-model="form.area" type="number" /></el-form-item>
-        <el-form-item label="价格(元)"
+        <el-form-item label="面积(㎡)" prop="area"
+          ><el-input v-model="form.area" type="number"
+        /></el-form-item>
+        <el-form-item label="价格(元)" prop="price"
           ><el-input v-model="form.price" type="number"
         /></el-form-item>
         <el-form-item label="描述"
@@ -59,6 +63,13 @@ const showDialog = ref(false)
 const editingId = ref(null)
 const loading = ref(false)
 const saving = ref(false)
+
+const formRules = {
+  title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
+  district: [{ required: true, message: '请输入区域', trigger: 'blur' }],
+  price: [{ required: true, message: '请输入价格', trigger: 'blur' }],
+  area: [{ required: true, message: '请输入面积', trigger: 'blur' }]
+}
 
 const emptyForm = () => ({
   title: '',

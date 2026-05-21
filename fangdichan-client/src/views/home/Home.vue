@@ -1,54 +1,35 @@
 <template>
   <div>
-    <div style="display: flex; gap: 8px; margin-bottom: 16px">
+    <div class="search-bar">
       <el-input
         v-model="keyword"
         placeholder="搜索房源"
-        style="flex: 1"
+        class="search-input"
         @keyup.enter="quickSearch(keyword)"
       />
       <el-button type="primary" @click="quickSearch(keyword)">搜索</el-button>
       <el-button @click="openGuide">帮我找房</el-button>
     </div>
-    <div style="margin-bottom: 16px">
-      <el-tag
-        v-for="tag in quickTags"
-        :key="tag"
-        style="margin-right: 8px; cursor: pointer"
-        @click="quickSearch(tag)"
-        >{{ tag }}</el-tag
-      >
+    <div class="tag-row">
+      <el-tag v-for="tag in quickTags" :key="tag" class="tag-item" @click="quickSearch(tag)">{{
+        tag
+      }}</el-tag>
     </div>
     <h3>推荐房源</h3>
-    <div v-if="loading" style="text-align: center; padding: 40px; color: #999">加载中...</div>
-    <div v-else-if="properties.length === 0" style="text-align: center; padding: 40px; color: #999">
-      暂无推荐房源
-    </div>
-    <div v-else style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px">
+    <div v-if="loading" class="empty-state">加载中...</div>
+    <div v-else-if="properties.length === 0" class="empty-state">暂无推荐房源</div>
+    <div v-else class="card-grid">
       <el-card
         v-for="p in properties"
         :key="p.id"
         shadow="hover"
-        style="cursor: pointer"
+        class="card-item"
         @click="$router.push('/detail/' + p.id)"
       >
-        <div
-          style="
-            height: 140px;
-            background: #e0e0e0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #999;
-          "
-        >
-          图片
-        </div>
+        <div class="image-placeholder">图片</div>
         <h4>{{ p.title }}</h4>
-        <p style="color: #f56c6c; font-size: 18px">¥{{ p.price }}</p>
-        <p style="font-size: 12px; color: #999">
-          {{ p.area }}㎡ / {{ p.roomType }} / {{ p.floor || '-' }}层
-        </p>
+        <p class="price-text">¥{{ p.price }}</p>
+        <p class="meta-text">{{ p.area }}㎡ / {{ p.roomType }} / {{ p.floor || '-' }}层</p>
       </el-card>
     </div>
 
@@ -72,21 +53,10 @@
       </div>
       <div v-if="guideStep === 4">
         <h4>推荐结果</h4>
-        <div v-if="guideLoading" style="text-align: center; padding: 20px; color: #999">
-          搜索中...
-        </div>
-        <div
-          v-else-if="guideResults.length === 0"
-          style="text-align: center; padding: 20px; color: #999"
-        >
-          未找到符合条件的房源
-        </div>
+        <div v-if="guideLoading" class="empty-state">搜索中...</div>
+        <div v-else-if="guideResults.length === 0" class="empty-state">未找到符合条件的房源</div>
         <div v-else>
-          <div
-            v-for="p in guideResults"
-            :key="p.id"
-            style="padding: 8px; border-bottom: 1px solid #eee"
-          >
+          <div v-for="p in guideResults" :key="p.id" class="guide-result-item">
             <router-link :to="'/detail/' + p.id">{{ p.title }} - ¥{{ p.price }}</router-link>
           </div>
         </div>
@@ -179,3 +149,54 @@ const nextGuide = () => {
 
 onMounted(fetchRecommended)
 </script>
+
+<style scoped>
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.image-placeholder {
+  height: 140px;
+  background: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+}
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+.search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.search-input {
+  flex: 1;
+}
+.tag-row {
+  margin-bottom: 16px;
+}
+.tag-item {
+  margin-right: 8px;
+  cursor: pointer;
+}
+.guide-result-item {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+.price-text {
+  color: #f56c6c;
+  font-size: 18px;
+}
+.meta-text {
+  font-size: 12px;
+  color: #999;
+}
+.card-item {
+  cursor: pointer;
+}
+</style>

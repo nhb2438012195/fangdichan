@@ -7,20 +7,16 @@
         <p>电话: {{ company.contactPhone }}</p>
         <p>简介: {{ company.description }}</p>
       </el-card>
-      <h4 style="margin-top: 16px">该公司房源</h4>
-      <div v-if="properties.length === 0" style="color: #999; padding: 16px; text-align: center">
-        暂无房源
-      </div>
-      <div v-for="p in properties" :key="p.id" style="margin-bottom: 8px">
-        <el-card style="cursor: pointer" @click="$router.push('/detail/' + p.id)">
+      <h4 class="section-title">该公司房源</h4>
+      <div v-if="properties.length === 0" class="empty-state">暂无房源</div>
+      <div v-for="p in properties" :key="p.id" class="property-item">
+        <el-card class="clickable-card" @click="$router.push('/detail/' + p.id)">
           <h4>{{ p.title }}</h4>
           <p>¥{{ p.price }} | {{ p.area }}㎡ | {{ p.roomType }}</p>
         </el-card>
       </div>
     </div>
-    <div v-else-if="!loading" style="text-align: center; padding: 40px; color: #999">
-      公司信息不存在
-    </div>
+    <div v-else-if="!loading" class="empty-state">公司信息不存在</div>
   </div>
 </template>
 
@@ -51,3 +47,20 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.section-title {
+  margin-top: 16px;
+}
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+.property-item {
+  margin-bottom: 8px;
+}
+.clickable-card {
+  cursor: pointer;
+}
+</style>

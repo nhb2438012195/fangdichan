@@ -1,7 +1,7 @@
 <template>
   <div>
     <h3>个人中心</h3>
-    <el-card style="margin-bottom: 16px">
+    <el-card class="profile-card">
       <h4>个人信息</h4>
       <el-form :model="profile" label-width="100px" :rules="profileRules">
         <el-form-item label="姓名" prop="realName"
@@ -12,7 +12,7 @@
         <el-button type="primary" @click="saveProfile">保存</el-button>
       </el-form>
     </el-card>
-    <el-card style="margin-bottom: 16px">
+    <el-card class="profile-card">
       <h4>购房意向</h4>
       <el-form :model="intent" label-width="100px">
         <el-form-item label="意向区域"><el-input v-model="intent.district" /></el-form-item>
@@ -82,3 +82,9 @@ const handleChangePassword = async () => {
   pwdForm.value = { oldPassword: '', newPassword: '' }
 }
 </script>
+
+<style scoped>
+.profile-card {
+  margin-bottom: 16px;
+}
+</style>

@@ -1,38 +1,34 @@
 <template>
-  <div style="display: flex; height: 70vh">
-    <div style="width: 280px; border-right: 1px solid #dcdfe6; overflow-y: auto">
+  <div class="message-layout">
+    <div class="conversation-sidebar">
       <div
         v-for="c in conversations"
         :key="c.id"
-        style="padding: 12px; cursor: pointer; border-bottom: 1px solid #eee"
+        class="conversation-item"
         :class="{ active: selected?.id === c.id }"
         @click="selectConversation(c)"
       >
         <div>
           <strong>会话 #{{ c.id }}</strong>
         </div>
-        <div style="font-size: 12px; color: #999">
+        <div class="conversation-meta">
           {{ c.propertyId ? '房源ID:' + c.propertyId : '' }}
         </div>
       </div>
-      <div v-if="!conversations.length" style="padding: 12px; color: #999; text-align: center">
-        暂无会话
-      </div>
+      <div v-if="!conversations.length" class="empty-conversations">暂无会话</div>
     </div>
-    <div style="flex: 1; display: flex; flex-direction: column">
-      <div v-loading="loadingMessages" style="flex: 1; padding: 16px; overflow-y: auto">
-        <div v-for="m in messages" :key="m.id" style="margin-bottom: 8px">
+    <div class="messages-panel">
+      <div v-loading="loadingMessages" class="messages-area">
+        <div v-for="m in messages" :key="m.id" class="message-item">
           <strong>{{ m.senderRole === 'CUSTOMER' ? '我' : '房地产商' }}:</strong> {{ m.content }}
         </div>
-        <div v-if="!selected" style="color: #999; text-align: center; margin-top: 40px">
-          选择一个会话
-        </div>
+        <div v-if="!selected" class="placeholder-text">选择一个会话</div>
       </div>
-      <div v-if="selected" style="display: flex; padding: 8px; border-top: 1px solid #dcdfe6">
+      <div v-if="selected" class="input-bar">
         <el-input
           v-model="newMsg"
           placeholder="输入消息"
-          style="margin-right: 8px"
+          class="input-field"
           @keyup.enter="handleSendMessage"
         />
         <el-button type="primary" :loading="sending" @click="handleSendMessage">发送</el-button>
@@ -42,9 +38,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { getConversationList, getMessages, sendMessage } from '../../api/message'
+import { useWebSocket } from '../../composables/useWebSocket'
 
 const route = useRoute()
 const conversations = ref([])
@@ -53,9 +50,13 @@ const messages = ref([])
 const newMsg = ref('')
 const loadingMessages = ref(false)
 const sending = ref(false)
-let ws = null
-let reconnectTimer = null
-let reconnectAttempts = 0
+
+const onWsMessage = (msg) => {
+  if (selected.value?.id === msg.conversationId) {
+    messages.value.push(msg)
+  }
+}
+const { connect: connectWs, send: wsSend } = useWebSocket(onWsMessage)
 
 const fetchConversations = async () => {
   const data = await getConversationList()
@@ -90,9 +91,7 @@ const handleSendMessage = async () => {
     await sendMessage(selected.value.id, content)
     messages.value.push({ content, senderRole: 'CUSTOMER', id: Date.now() })
     newMsg.value = ''
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ conversationId: selected.value.id, content }))
-    }
+    wsSend({ conversationId: selected.value.id, content })
   } catch {
     // error handled by interceptor
   } finally {
@@ -100,41 +99,73 @@ const handleSendMessage = async () => {
   }
 }
 
-const connectWs = () => {
-  const token = localStorage.getItem('token')
-  if (!token) return
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  ws = new WebSocket(`${protocol}//${window.location.host}/ws?token=${token}`)
-  ws.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data)
-      if (selected.value?.id === msg.conversationId) {
-        messages.value.push(msg)
-      }
-    } catch {}
-  }
-  ws.onclose = () => {
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000)
-    reconnectAttempts++
-    reconnectTimer = setTimeout(connectWs, delay)
-  }
-  ws.onopen = () => {
-    reconnectAttempts = 0
-  }
-}
-
 onMounted(() => {
   fetchConversations()
   connectWs()
-})
-onUnmounted(() => {
-  if (ws) ws.close()
-  if (reconnectTimer) clearTimeout(reconnectTimer)
 })
 </script>
 
 <style scoped>
 .active {
   background: #ecf5ff;
+}
+.message-layout {
+  display: flex;
+  height: 70vh;
+}
+.conversation-sidebar {
+  width: 280px;
+  border-right: 1px solid #dcdfe6;
+  overflow-y: auto;
+}
+.conversation-item {
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+.conversation-meta {
+  font-size: 12px;
+  color: #999;
+}
+.empty-conversations {
+  padding: 12px;
+  color: #999;
+  text-align: center;
+}
+.messages-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.messages-area {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+.message-item {
+  margin-bottom: 8px;
+}
+.placeholder-text {
+  color: #999;
+  text-align: center;
+  margin-top: 40px;
+}
+.input-bar {
+  display: flex;
+  padding: 8px;
+  border-top: 1px solid #dcdfe6;
+}
+.input-field {
+  margin-right: 8px;
+}
+@media (max-width: 768px) {
+  .message-layout {
+    flex-direction: column;
+    height: auto;
+  }
+  .conversation-sidebar {
+    width: 100%;
+    max-height: 200px;
+  }
 }
 </style>

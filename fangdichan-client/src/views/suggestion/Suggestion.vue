@@ -3,12 +3,12 @@
     <h3>提建议</h3>
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
       <el-form-item label="目标公司" prop="companyId">
-        <el-select v-model="form.companyId" filterable style="width: 100%">
+        <el-select v-model="form.companyId" filterable class="full-width">
           <el-option v-for="c in companies" :key="c.id" :value="c.id" :label="c.companyName" />
         </el-select>
       </el-form-item>
       <el-form-item label="期望房型" prop="desiredType">
-        <el-select v-model="form.desiredType" style="width: 100%">
+        <el-select v-model="form.desiredType" class="full-width">
           <el-option value="一室" /><el-option value="两室" /><el-option value="三室" /><el-option
             value="四室"
           />
@@ -81,3 +81,9 @@ const submit = async () => {
   }
 }
 </script>
+
+<style scoped>
+.full-width {
+  width: 100%;
+}
+</style>

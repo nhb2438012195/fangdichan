@@ -2,23 +2,12 @@
   <div v-if="property">
     <el-carousel height="300px" indicator-position="none">
       <el-carousel-item v-for="i in 5" :key="i"
-        ><div
-          style="
-            background: #e0e0e0;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #999;
-          "
-        >
-          图片 {{ i }}
-        </div></el-carousel-item
+        ><div class="carousel-placeholder">图片 {{ i }}</div></el-carousel-item
       >
     </el-carousel>
-    <el-card style="margin-top: 16px">
+    <el-card class="property-card">
       <h2>{{ property.title }}</h2>
-      <p style="color: #f56c6c; font-size: 24px">¥{{ property.price }}</p>
+      <p class="price-large">¥{{ property.price }}</p>
       <p>
         单价: ¥{{ property.unitPrice }}/㎡ | 面积: {{ property.area }}㎡ | 户型:
         {{ property.roomType }}
@@ -31,7 +20,7 @@
       <p>地址: {{ property.location }}</p>
       <p>{{ property.description }}</p>
     </el-card>
-    <div style="display: flex; gap: 8px; margin-top: 16px">
+    <div class="action-bar">
       <el-button type="danger" @click="handleToggleFavorite">{{
         isFav ? '取消收藏' : '❤️ 收藏'
       }}</el-button>
@@ -102,3 +91,27 @@ const handleCreateOrder = async () => {
   }
 }
 </script>
+
+<style scoped>
+.action-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.carousel-placeholder {
+  background: #e0e0e0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+}
+.property-card {
+  margin-top: 16px;
+}
+.price-large {
+  color: #f56c6c;
+  font-size: 24px;
+}
+</style>

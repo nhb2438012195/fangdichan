@@ -1,10 +1,7 @@
 <template>
   <div>
     <h3>我的收藏</h3>
-    <div
-      v-if="favorites.length"
-      style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px"
-    >
+    <div v-if="favorites.length" class="fav-grid">
       <el-card v-for="f in favorites" :key="f.id" shadow="hover">
         <h4>{{ f.title }}</h4>
         <p>¥{{ f.price }}</p>
@@ -18,7 +15,7 @@
       </el-card>
     </div>
     <el-empty v-else description="暂无收藏" />
-    <div style="margin-top: 16px; text-align: center">
+    <div class="pagination-wrapper">
       <el-pagination
         v-if="total > size"
         v-model:current-page="currentPage"
@@ -67,3 +64,15 @@ const removeFavorite = async (propertyId) => {
 
 onMounted(fetchFavs)
 </script>
+
+<style scoped>
+.fav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.pagination-wrapper {
+  margin-top: 16px;
+  text-align: center;
+}
+</style>

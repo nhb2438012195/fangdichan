@@ -1,9 +1,9 @@
 <template>
   <div>
-    <div style="margin-bottom:16px">
-      <el-button type="primary" @click="showDialog = true">发布房源</el-button>
+    <div style="margin-bottom: 16px">
+      <el-button type="primary" @click="openCreate">发布房源</el-button>
     </div>
-    <el-table :data="properties" stripe>
+    <el-table v-loading="loading" :data="properties" stripe>
       <el-table-column prop="title" label="标题" />
       <el-table-column prop="district" label="区域" />
       <el-table-column prop="price" label="价格" />
@@ -11,7 +11,9 @@
       <el-table-column label="操作">
         <template #default="{ row }">
           <el-button @click="editProperty(row)">编辑</el-button>
-          <el-button type="danger" @click="takeOff(row.id)" v-if="row.status === 'APPROVED'">下架</el-button>
+          <el-button v-if="row.status === 'APPROVED'" type="danger" @click="takeOff(row.id)"
+            >下架</el-button
+          >
         </template>
       </el-table-column>
     </el-table>
@@ -22,15 +24,21 @@
         <el-form-item label="区域"><el-input v-model="form.district" /></el-form-item>
         <el-form-item label="地址"><el-input v-model="form.location" /></el-form-item>
         <el-form-item label="楼层区间"><el-input v-model="form.floor" /></el-form-item>
-        <el-form-item label="总楼层"><el-input type="number" v-model="form.floorTotal" /></el-form-item>
+        <el-form-item label="总楼层"
+          ><el-input v-model="form.floorTotal" type="number"
+        /></el-form-item>
         <el-form-item label="户型"><el-input v-model="form.roomType" /></el-form-item>
-        <el-form-item label="面积(㎡)"><el-input type="number" v-model="form.area" /></el-form-item>
-        <el-form-item label="价格(元)"><el-input type="number" v-model="form.price" /></el-form-item>
-        <el-form-item label="描述"><el-input type="textarea" v-model="form.description" /></el-form-item>
+        <el-form-item label="面积(㎡)"><el-input v-model="form.area" type="number" /></el-form-item>
+        <el-form-item label="价格(元)"
+          ><el-input v-model="form.price" type="number"
+        /></el-form-item>
+        <el-form-item label="描述"
+          ><el-input v-model="form.description" type="textarea"
+        /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveProperty">保存</el-button>
+        <el-button type="primary" :loading="saving" @click="saveProperty">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -44,34 +52,72 @@ import request from '../../api/request'
 const properties = ref([])
 const showDialog = ref(false)
 const editingId = ref(null)
-const form = ref({ title: '', district: '', location: '', floor: '', floorTotal: '', roomType: '', area: '', price: '', description: '' })
+const loading = ref(false)
+const saving = ref(false)
+
+const emptyForm = () => ({
+  title: '',
+  district: '',
+  location: '',
+  floor: '',
+  floorTotal: '',
+  roomType: '',
+  area: '',
+  price: '',
+  description: ''
+})
+const form = ref(emptyForm())
 
 const fetchList = async () => {
-  const res = await request.get('/agent/property/list', { params: { page: 1, size: 100 } })
-  properties.value = res.data.list
+  loading.value = true
+  try {
+    const res = await request.get('/agent/property/list', { params: { page: 1, size: 100 } })
+    properties.value = res.data.list || []
+  } catch {
+    properties.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+const openCreate = () => {
+  editingId.value = null
+  form.value = emptyForm()
+  showDialog.value = true
 }
 
 const saveProperty = async () => {
-  if (editingId.value) {
-    await request.put(`/agent/property/${editingId.value}`, form.value)
-  } else {
-    await request.post('/agent/property', form.value)
+  saving.value = true
+  try {
+    if (editingId.value) {
+      await request.put(`/agent/property/${editingId.value}`, form.value)
+    } else {
+      await request.post('/agent/property', form.value)
+    }
+    ElMessage.success('保存成功')
+    showDialog.value = false
+    fetchList()
+  } catch {
+    ElMessage.error('保存失败')
+  } finally {
+    saving.value = false
   }
-  ElMessage.success('保存成功')
-  showDialog.value = false
-  fetchList()
 }
 
 const editProperty = (row) => {
   editingId.value = row.id
-  form.value = { ...row }
+  form.value = JSON.parse(JSON.stringify(row))
   showDialog.value = true
 }
 
 const takeOff = async (id) => {
-  await request.put(`/agent/property/${id}/off-market`)
-  ElMessage.success('已下架')
-  fetchList()
+  try {
+    await request.put(`/agent/property/${id}/off-market`)
+    ElMessage.success('已下架')
+    fetchList()
+  } catch {
+    ElMessage.error('下架失败')
+  }
 }
 
 onMounted(fetchList)

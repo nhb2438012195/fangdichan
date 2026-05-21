@@ -4,10 +4,12 @@
       <h2>购房通管理后台</h2>
       <el-form :model="form" @submit.prevent="handleLogin">
         <el-form-item><el-input v-model="form.username" placeholder="用户名" /></el-form-item>
-        <el-form-item><el-input v-model="form.password" type="password" placeholder="密码" /></el-form-item>
-        <el-button type="primary" @click="handleLogin" :loading="loading">登录</el-button>
+        <el-form-item
+          ><el-input v-model="form.password" type="password" placeholder="密码"
+        /></el-form-item>
+        <el-button type="primary" :loading="loading" native-type="submit">登录</el-button>
       </el-form>
-      <div style="margin-top:12px">
+      <div style="margin-top: 12px">
         <router-link to="/register">注册账号</router-link>
       </div>
     </el-card>
@@ -18,6 +20,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../store/auth'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -29,12 +32,27 @@ const handleLogin = async () => {
   try {
     await auth.login(form.username, form.password)
     router.push('/')
-  } finally { loading.value = false }
+  } catch (e) {
+    ElMessage.error(e.response?.data?.msg || '登录失败')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
 <style scoped>
-.login-container { height: 100vh; display: flex; align-items: center; justify-content: center; background: #f0f2f5; }
-.login-card { width: 400px; }
-.login-card h2 { text-align: center; margin-bottom: 24px; }
+.login-container {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f2f5;
+}
+.login-card {
+  width: 400px;
+}
+.login-card h2 {
+  text-align: center;
+  margin-bottom: 24px;
+}
 </style>

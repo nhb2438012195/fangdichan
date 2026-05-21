@@ -31,8 +31,16 @@ const fetchConfigs = async () => {
 }
 
 const saveConfig = async (row) => {
-  await request.put(`/admin/config/${row.id}`, { configValue: row.configValue })
-  ElMessage.success('保存成功')
+  try {
+    const params = new URLSearchParams()
+    params.append('value', row.configValue)
+    await request.put(`/admin/config/${row.configKey}`, params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
+    ElMessage.success('保存成功')
+  } catch {
+    ElMessage.error('保存失败')
+  }
 }
 
 onMounted(fetchConfigs)

@@ -64,4 +64,16 @@ describe('API Contract: Customer API endpoints', () => {
     expect(res.data.data).toHaveProperty('list')
     expect(res.data.data).toHaveProperty('total')
   })
+
+  it('GET /api/customer/property/search should filter by district', async () => {
+    const res = await request.get('/customer/property/search', {
+      params: { district: '朝阳区', page: 1, size: 10 }
+    })
+    expect(res.data.code).toBe(200)
+    expect(res.data.data).toHaveProperty('list')
+    expect(res.data.data).toHaveProperty('total')
+    expect(res.data.data).toHaveProperty('page')
+    expect(res.data.data).toHaveProperty('size')
+    expect(Array.isArray(res.data.data.list)).toBe(true)
+  })
 })

@@ -36,6 +36,39 @@ export const handlers = [
     })
   }),
 
+  // Customer: property search (with filters)
+  http.get(`${BASE}/customer/property/search`, ({ request }) => {
+    const url = new URL(request.url)
+    const district = url.searchParams.get('district') || ''
+    const list = [
+      {
+        id: 1,
+        title: '朝阳区精装三居室',
+        district: '朝阳区',
+        roomType: '三室两厅',
+        area: 120,
+        price: 5000000,
+        unitPrice: 41666,
+        isVacant: true
+      },
+      {
+        id: 2,
+        title: '海淀区学区两居室',
+        district: '海淀区',
+        roomType: '两室一厅',
+        area: 85,
+        price: 3500000,
+        unitPrice: 41176,
+        isVacant: true
+      }
+    ].filter((p) => !district || p.district === district)
+    return HttpResponse.json({
+      code: 200,
+      msg: 'success',
+      data: { list, total: list.length, page: 1, size: 10 }
+    })
+  }),
+
   // Customer: recommended properties (BEFORE :id to avoid route conflict)
   http.get(`${BASE}/customer/property/recommended`, () => {
     return HttpResponse.json({

@@ -102,6 +102,9 @@ function cleanParams(params) {
   const cleaned = {}
   for (const [key, value] of Object.entries(params)) {
     if (value !== null && value !== undefined && value !== '') {
+      if (['priceMin', 'priceMax', 'areaMin', 'areaMax'].includes(key) && value === 0) {
+        continue
+      }
       cleaned[key] = value
     }
   }

@@ -9,7 +9,7 @@
         /></el-form-item>
         <el-button type="primary" :loading="loading" native-type="submit">登录</el-button>
       </el-form>
-      <div style="margin-top: 12px">
+      <div class="register-link">
         <router-link to="/register">注册账号</router-link>
       </div>
     </el-card>
@@ -46,13 +46,17 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0f2f5;
+  background: var(--color-bg-dark, #f0f2f5);
 }
 .login-card {
-  width: 400px;
+  width: 380px;
+  max-width: 90vw;
 }
 .login-card h2 {
   text-align: center;
   margin-bottom: 24px;
+}
+.register-link {
+  margin-top: 12px;
 }
 </style>

@@ -23,10 +23,7 @@
         </template>
       </el-table-column>
     </el-table>
-    <div
-      v-if="!loading && orders.length === 0"
-      style="text-align: center; padding: 40px; color: #999"
-    >
+    <div v-if="!loading && orders.length === 0" class="empty-state">
       <el-empty description="暂无订单" />
     </div>
   </div>
@@ -81,3 +78,11 @@ const cancel = async (id) => {
 
 onMounted(fetchOrders)
 </script>
+
+<style scoped>
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+</style>

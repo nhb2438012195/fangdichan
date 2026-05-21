@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div style="margin-bottom: 16px">
+    <div class="action-bar">
       <el-button type="primary" @click="openCreate">发布房源</el-button>
     </div>
     <el-table v-loading="loading" :data="properties" stripe>
@@ -138,3 +138,9 @@ const handleTakeOff = async (id) => {
 
 onMounted(fetchList)
 </script>
+
+<style scoped>
+.action-bar {
+  margin-bottom: 16px;
+}
+</style>

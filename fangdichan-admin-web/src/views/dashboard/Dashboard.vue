@@ -23,3 +23,11 @@
 import { useAuthStore } from '../../store/auth'
 const { role } = useAuthStore()
 </script>
+
+<style scoped>
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--spacing-md);
+}
+</style>

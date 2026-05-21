@@ -1,5 +1,5 @@
 <template>
-  <el-container style="height: 100vh">
+  <el-container class="app-layout">
     <el-aside width="220px">
       <el-menu
         :router="true"
@@ -21,18 +21,10 @@
       </el-menu>
     </el-aside>
     <el-container>
-      <el-header
-        style="
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          background: #fff;
-          border-bottom: 1px solid #dcdfe6;
-        "
-      >
+      <el-header class="app-header">
         <span>购房通管理后台</span>
         <div>
-          <span style="margin-right: 16px">{{
+          <span class="header-role">{{
             auth.role === 'ADMIN' ? '管理员' : auth.role === 'AGENT' ? '房地产商' : '客户'
           }}</span>
           <el-button size="small" @click="handleLogout">退出</el-button>
@@ -55,3 +47,27 @@ const handleLogout = () => {
   router.push('/login')
 }
 </script>
+
+<style scoped>
+.app-layout {
+  height: 100vh;
+}
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #dcdfe6;
+}
+.header-role {
+  margin-right: 16px;
+}
+@media (max-width: 768px) {
+  .sidebar {
+    width: 64px !important;
+  }
+  .sidebar :deep(.el-menu-item span) {
+    display: none;
+  }
+}
+</style>

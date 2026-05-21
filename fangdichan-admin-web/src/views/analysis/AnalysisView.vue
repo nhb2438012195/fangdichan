@@ -2,14 +2,14 @@
   <div>
     <h3>关联分析</h3>
     <div v-loading="loading">
-      <div v-if="error" style="text-align: center; padding: 40px; color: #999">数据加载失败</div>
+      <div v-if="error" class="error-state">数据加载失败</div>
       <template v-else>
         <h4>按区域空置率</h4>
-        <div ref="districtChart" style="height: 300px"></div>
+        <div ref="districtChart" class="chart-container"></div>
         <h4>按楼层空置率</h4>
-        <div ref="floorChart" style="height: 300px"></div>
+        <div ref="floorChart" class="chart-container"></div>
         <h4>按户型空置率</h4>
-        <div ref="roomTypeChart" style="height: 300px"></div>
+        <div ref="roomTypeChart" class="chart-container"></div>
       </template>
     </div>
   </div>
@@ -63,3 +63,14 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
 </script>
+
+<style scoped>
+.error-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+.chart-container {
+  height: 300px;
+}
+</style>

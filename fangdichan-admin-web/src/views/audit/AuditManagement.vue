@@ -16,10 +16,7 @@
         </template>
       </el-table-column>
     </el-table>
-    <div
-      v-if="!loading && pendingList.length === 0"
-      style="text-align: center; padding: 40px; color: #999"
-    >
+    <div v-if="!loading && pendingList.length === 0" class="empty-state">
       <el-empty description="暂无待审核房源" />
     </div>
   </div>
@@ -73,3 +70,11 @@ const reject = async (id) => {
 
 onMounted(fetchList)
 </script>
+
+<style scoped>
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+</style>

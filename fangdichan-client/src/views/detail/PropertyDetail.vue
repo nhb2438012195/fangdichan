@@ -32,7 +32,7 @@
       <p>{{ property.description }}</p>
     </el-card>
     <div style="display: flex; gap: 8px; margin-top: 16px">
-      <el-button type="danger" @click="toggleFavorite">{{
+      <el-button type="danger" @click="handleToggleFavorite">{{
         isFav ? '取消收藏' : '❤️ 收藏'
       }}</el-button>
       <el-button type="primary" @click="createOrder">立即购买</el-button>
@@ -47,6 +47,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getPropertyDetail } from '../../api/property'
+import { toggleFavorite, checkFavorite } from '../../api/favorite'
 import request from '../../api/request'
 
 const route = useRoute()
@@ -56,18 +57,23 @@ const isFav = ref(false)
 const contacting = ref(false)
 
 onMounted(async () => {
-  const data = await getPropertyDetail(route.params.id)
-  property.value = data
   try {
-    const favRes = await request.get(`/customer/favorite/check/${route.params.id}`)
-    isFav.value = favRes.data
+    property.value = await getPropertyDetail(route.params.id)
+  } catch {
+    return
+  }
+  try {
+    isFav.value = await checkFavorite(route.params.id)
   } catch {}
 })
 
-const toggleFavorite = async () => {
-  const res = await request.post(`/customer/favorite/${route.params.id}`)
-  isFav.value = res.data
-  ElMessage.success(isFav.value ? '已收藏' : '已取消收藏')
+const handleToggleFavorite = async () => {
+  try {
+    isFav.value = await toggleFavorite(route.params.id)
+    ElMessage.success(isFav.value ? '已收藏' : '已取消收藏')
+  } catch {
+    ElMessage.error('操作失败')
+  }
 }
 
 const contactAgent = async () => {

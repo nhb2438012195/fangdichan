@@ -34,7 +34,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { getFavoriteList, toggleFavorite } from '../../api/favorite'
 
 const favorites = ref([])
 const currentPage = ref(1)
@@ -44,11 +44,9 @@ const removingId = ref(null)
 
 const fetchFavs = async () => {
   try {
-    const res = await request.get('/customer/favorite/list', {
-      params: { page: currentPage.value, size: size.value }
-    })
-    favorites.value = res.data.list || res.data || []
-    total.value = res.data.total || 0
+    const data = await getFavoriteList({ page: currentPage.value, size: size.value })
+    favorites.value = data.list || []
+    total.value = data.total || 0
   } catch {
     ElMessage.error('获取收藏列表失败')
   }
@@ -57,7 +55,7 @@ const fetchFavs = async () => {
 const removeFavorite = async (propertyId) => {
   removingId.value = propertyId
   try {
-    await request.post(`/customer/favorite/${propertyId}`)
+    await toggleFavorite(propertyId)
     ElMessage.success('已取消收藏')
     fetchFavs()
   } catch {

@@ -35,7 +35,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { getOrderList, confirmOrder, cancelOrder } from '../../api/order'
 
 const orders = ref([])
 const loading = ref(false)
@@ -44,8 +44,8 @@ const processingId = ref(null)
 const fetchOrders = async () => {
   loading.value = true
   try {
-    const res = await request.get('/agent/order/list', { params: { page: 1, size: 100 } })
-    orders.value = res.data.list || []
+    const result = await getOrderList({ page: 1, size: 100 })
+    orders.value = result.list || []
   } catch {
     orders.value = []
   } finally {
@@ -56,7 +56,7 @@ const fetchOrders = async () => {
 const confirm = async (id) => {
   processingId.value = id
   try {
-    await request.put(`/agent/order/${id}/confirm`)
+    await confirmOrder(id)
     ElMessage.success('已确认')
     fetchOrders()
   } catch {
@@ -69,7 +69,7 @@ const confirm = async (id) => {
 const cancel = async (id) => {
   processingId.value = id
   try {
-    await request.put(`/agent/order/${id}/cancel`)
+    await cancelOrder(id)
     ElMessage.success('已取消')
     fetchOrders()
   } catch {

@@ -18,7 +18,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
-import request from '../../api/request'
+import { getVacancyAnalysis } from '../../api/analysis'
 
 const loading = ref(true)
 const error = ref(false)
@@ -43,9 +43,8 @@ const handleResize = () => charts.forEach((c) => c.resize())
 
 onMounted(async () => {
   try {
-    const res = await request.get('/agent/analysis/vacancy')
+    const data = await getVacancyAnalysis()
     nextTick(() => {
-      const data = res.data || {}
       if (data.district) renderChart(districtChart, data.district, '按区域空置率')
       if (data.floor) renderChart(floorChart, data.floor, '按楼层空置率')
       if (data.roomType) renderChart(roomTypeChart, data.roomType, '按户型空置率')

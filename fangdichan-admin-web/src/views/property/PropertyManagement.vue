@@ -11,7 +11,7 @@
       <el-table-column label="操作">
         <template #default="{ row }">
           <el-button @click="editProperty(row)">编辑</el-button>
-          <el-button v-if="row.status === 'APPROVED'" type="danger" @click="takeOff(row.id)"
+          <el-button v-if="row.status === 'APPROVED'" type="danger" @click="handleTakeOff(row.id)"
             >下架</el-button
           >
         </template>
@@ -47,7 +47,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import {
+  getMyPropertyList,
+  createProperty,
+  updateProperty,
+  takeOffProperty
+} from '../../api/agent-property'
 
 const properties = ref([])
 const showDialog = ref(false)
@@ -71,8 +76,8 @@ const form = ref(emptyForm())
 const fetchList = async () => {
   loading.value = true
   try {
-    const res = await request.get('/agent/property/list', { params: { page: 1, size: 100 } })
-    properties.value = res.data.list || []
+    const result = await getMyPropertyList({ page: 1, size: 100 })
+    properties.value = result.list || []
   } catch {
     properties.value = []
   } finally {
@@ -90,9 +95,9 @@ const saveProperty = async () => {
   saving.value = true
   try {
     if (editingId.value) {
-      await request.put(`/agent/property/${editingId.value}`, form.value)
+      await updateProperty(editingId.value, form.value)
     } else {
-      await request.post('/agent/property', form.value)
+      await createProperty(form.value)
     }
     ElMessage.success('保存成功')
     showDialog.value = false
@@ -110,9 +115,9 @@ const editProperty = (row) => {
   showDialog.value = true
 }
 
-const takeOff = async (id) => {
+const handleTakeOff = async (id) => {
   try {
-    await request.put(`/agent/property/${id}/off-market`)
+    await takeOffProperty(id)
     ElMessage.success('已下架')
     fetchList()
   } catch {

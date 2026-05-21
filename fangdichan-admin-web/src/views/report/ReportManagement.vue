@@ -28,7 +28,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { getReportList, handleReport } from '../../api/report'
 
 const reports = ref([])
 const loading = ref(false)
@@ -37,8 +37,7 @@ const processingId = ref(null)
 const fetchReports = async () => {
   loading.value = true
   try {
-    const res = await request.get('/admin/report/list')
-    reports.value = res.data.list || res.data || []
+    reports.value = await getReportList()
   } catch {
     reports.value = []
   } finally {
@@ -49,7 +48,7 @@ const fetchReports = async () => {
 const handleStatus = async (id, status) => {
   processingId.value = id
   try {
-    await request.put(`/admin/report/${id}/status`, null, { params: { status } })
+    await handleReport(id, status)
     ElMessage.success('操作成功')
     fetchReports()
   } catch {

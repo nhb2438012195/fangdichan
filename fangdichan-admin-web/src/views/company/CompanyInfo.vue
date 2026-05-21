@@ -18,7 +18,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { getCompanyInfo, updateCompanyInfo } from '../../api/company'
 
 const form = ref({ companyName: '', address: '', contactPhone: '', description: '' })
 const loading = ref(false)
@@ -28,8 +28,8 @@ const loaded = ref(false)
 const fetchCompany = async () => {
   loading.value = true
   try {
-    const res = await request.get('/agent/company')
-    if (res.data) form.value = res.data
+    const data = await getCompanyInfo()
+    if (data) form.value = data
     loaded.value = true
   } catch {
     // will show empty form
@@ -42,7 +42,7 @@ const fetchCompany = async () => {
 const handleSave = async () => {
   saving.value = true
   try {
-    await request.put('/agent/company', form.value)
+    await updateCompanyInfo(form.value)
     ElMessage.success('保存成功')
   } catch {
     ElMessage.error('保存失败')

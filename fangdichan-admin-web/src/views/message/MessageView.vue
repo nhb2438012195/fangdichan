@@ -27,7 +27,7 @@
       </div>
       <div v-if="selected" style="display: flex; padding: 8px; border-top: 1px solid #dcdfe6">
         <el-input v-model="newMsg" placeholder="输入消息" style="margin-right: 8px" />
-        <el-button type="primary" @click="sendMessage">发送</el-button>
+        <el-button type="primary" @click="handleSendMessage">发送</el-button>
       </div>
     </div>
   </div>
@@ -35,7 +35,8 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import request from '../../api/request'
+import { ElMessage } from 'element-plus'
+import { getConversationList, getMessages, sendMessage } from '../../api/message'
 
 const conversations = ref([])
 const selected = ref(null)
@@ -43,21 +44,31 @@ const messages = ref([])
 const newMsg = ref('')
 
 const fetchConversations = async () => {
-  const res = await request.get('/agent/conversation/list')
-  conversations.value = res.data.list || res.data
+  try {
+    conversations.value = await getConversationList()
+  } catch {
+    conversations.value = []
+  }
 }
 
 const selectConversation = async (c) => {
   selected.value = c
-  const res = await request.get(`/agent/conversation/${c.id}/messages`)
-  messages.value = res.data
+  try {
+    messages.value = await getMessages(c.id)
+  } catch {
+    messages.value = []
+  }
 }
 
-const sendMessage = async () => {
+const handleSendMessage = async () => {
   if (!newMsg.value.trim()) return
-  await request.post(`/agent/conversation/${selected.value.id}/message`, { content: newMsg.value })
-  messages.value.push({ content: newMsg.value, senderRole: 'AGENT', id: Date.now() })
-  newMsg.value = ''
+  try {
+    await sendMessage(selected.value.id, newMsg.value)
+    messages.value.push({ content: newMsg.value, senderRole: 'AGENT', id: Date.now() })
+    newMsg.value = ''
+  } catch {
+    ElMessage.error('发送失败')
+  }
 }
 
 onMounted(fetchConversations)

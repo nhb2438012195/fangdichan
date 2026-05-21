@@ -12,7 +12,7 @@
           <el-button
             :type="row.status ? 'warning' : 'success'"
             :loading="togglingId === row.id"
-            @click="toggleStatus(row)"
+            @click="handleToggleStatus(row)"
           >
             {{ row.status ? '禁用' : '启用' }}
           </el-button>
@@ -25,7 +25,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { getUserList, toggleUserStatus } from '../../api/user'
 
 const users = ref([])
 const loading = ref(false)
@@ -34,8 +34,7 @@ const togglingId = ref(null)
 const fetchUsers = async () => {
   loading.value = true
   try {
-    const res = await request.get('/admin/users')
-    users.value = res.data || []
+    users.value = await getUserList()
   } catch {
     users.value = []
   } finally {
@@ -43,10 +42,10 @@ const fetchUsers = async () => {
   }
 }
 
-const toggleStatus = async (row) => {
+const handleToggleStatus = async (row) => {
   togglingId.value = row.id
   try {
-    await request.put(`/admin/users/${row.id}/status`, { status: row.status ? 0 : 1 })
+    await toggleUserStatus(row.id, row.status)
     row.status = row.status ? 0 : 1
     ElMessage.success('操作成功')
   } catch {

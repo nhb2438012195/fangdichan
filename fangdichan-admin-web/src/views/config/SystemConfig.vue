@@ -21,22 +21,21 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import request from '../../api/request'
+import { getConfigList, updateConfig } from '../../api/config'
 
 const configs = ref([])
 
 const fetchConfigs = async () => {
-  const res = await request.get('/admin/config/list')
-  configs.value = res.data.list || res.data
+  try {
+    configs.value = await getConfigList()
+  } catch {
+    configs.value = []
+  }
 }
 
 const saveConfig = async (row) => {
   try {
-    const params = new URLSearchParams()
-    params.append('value', row.configValue)
-    await request.put(`/admin/config/${row.configKey}`, params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    })
+    await updateConfig(row.configKey, row.configValue)
     ElMessage.success('保存成功')
   } catch {
     ElMessage.error('保存失败')

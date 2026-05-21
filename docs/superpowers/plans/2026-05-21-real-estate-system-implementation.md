@@ -212,6 +212,24 @@ ssh root@182.92.176.70 "cd /deploy && docker compose up -d"
 
 ---
 
+## 测试策略
+
+**后端测试框架**: JUnit 5 + Mockito + Spring Boot Test（`spring-boot-starter-test`）
+
+**前端测试框架**: Vitest + @vue/test-utils（仅管理后台，桌面端暂不覆盖）
+
+**测试目录结构**:
+- `fangdichan-server/src/test/java/com/fdsc/` — 后端测试，包路径与主代码一致
+- `fangdichan-admin-web/src/__tests__/` — 前端测试
+
+**测试要求**:
+- 每个 Service 方法至少一个正常路径 + 一个异常路径测试
+- Controller 集成测试验证 HTTP 状态码和响应结构
+- 测试不依赖外部数据库，使用 Mock 隔离
+- 前一个 Task 的测试通过后，再进入下一个 Task
+
+---
+
 ## 阶段一：项目初始化与基础设施
 
 ### Task 1: 初始化后端项目（fangdichan-server）
@@ -321,6 +339,13 @@ ssh root@182.92.176.70 "cd /deploy && docker compose up -d"
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -1095,6 +1120,69 @@ git commit -m "feat: implement JWT authentication and Spring Security config"
 
 ---
 
+### Task 5.5: 为已完成模块（Tasks 1-5）补充测试
+
+**Files:**
+- Create: `fangdichan-server/src/test/java/com/fdsc/security/JwtTokenProviderTest.java`
+
+- [ ] **Step 1: 创建 JWT 工具测试**
+
+```java
+package com.fdsc.security;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class JwtTokenProviderTest {
+
+    private JwtTokenProvider jwtTokenProvider;
+
+    @BeforeEach
+    void setUp() {
+        jwtTokenProvider = new JwtTokenProvider("test-secret-key-for-unit-testing-purposes-only!", 3600000);
+    }
+
+    @Test
+    void generateAndValidateToken_shouldSucceed() {
+        String token = jwtTokenProvider.generateToken(1L, "ADMIN");
+        assertNotNull(token);
+        assertTrue(jwtTokenProvider.validateToken(token));
+    }
+
+    @Test
+    void getUserIdFromToken_shouldReturnCorrectId() {
+        String token = jwtTokenProvider.generateToken(42L, "CUSTOMER");
+        assertEquals(42L, jwtTokenProvider.getUserIdFromToken(token));
+    }
+
+    @Test
+    void getRoleFromToken_shouldReturnCorrectRole() {
+        String token = jwtTokenProvider.generateToken(1L, "AGENT");
+        assertEquals("AGENT", jwtTokenProvider.getRoleFromToken(token));
+    }
+
+    @Test
+    void validateToken_shouldReturnFalseForInvalidToken() {
+        assertFalse(jwtTokenProvider.validateToken("invalid-token"));
+    }
+}
+```
+
+- [ ] **Step 2: 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS，所有 JWT 测试通过
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add fangdichan-server/src/test/java/com/fdsc/security/
+git commit -m "test: add JWT token provider unit tests"
+```
+
+---
+
 ### Task 6: 用户登录注册接口
 
 **Files:**
@@ -1348,15 +1436,158 @@ public class AdminInitializer implements CommandLineRunner {
 Run: `cd fangdichan-server && mvn clean compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 10: 启动并测试登录**
+- [ ] **Step 10: 创建 Service 单元测试**
+
+**Files:**
+- Create: `fangdichan-server/src/test/java/com/fdsc/module/user/service/UserServiceImplTest.java`
+
+```java
+package com.fdsc.module.user.service;
+
+import com.fdsc.common.exception.BusinessException;
+import com.fdsc.module.user.dto.LoginRequest;
+import com.fdsc.module.user.entity.SysUser;
+import com.fdsc.module.user.mapper.UserMapper;
+import com.fdsc.module.user.mapper.CustomerProfileMapper;
+import com.fdsc.module.user.service.impl.UserServiceImpl;
+import com.fdsc.security.JwtTokenProvider;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceImplTest {
+
+    @Mock private UserMapper userMapper;
+    @Mock private CustomerProfileMapper customerProfileMapper;
+    @Mock private JwtTokenProvider jwtTokenProvider;
+
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private UserServiceImpl userService;
+
+    @BeforeEach
+    void setUp() {
+        userService = new UserServiceImpl(userMapper, customerProfileMapper, passwordEncoder, jwtTokenProvider);
+    }
+
+    @Test
+    void login_shouldSucceedWithValidCredentials() {
+        SysUser user = new SysUser();
+        user.setId(1L);
+        user.setUsername("admin");
+        user.setPassword(passwordEncoder.encode("admin123"));
+        user.setRole("ADMIN");
+        user.setStatus(1);
+        when(userMapper.selectOne(any())).thenReturn(user);
+        when(jwtTokenProvider.generateToken(1L, "ADMIN")).thenReturn("mock-token");
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("admin");
+        request.setPassword("admin123");
+        var response = userService.login(request);
+
+        assertNotNull(response);
+        assertEquals("mock-token", response.getToken());
+        assertEquals("ADMIN", response.getRole());
+    }
+
+    @Test
+    void login_shouldThrowWithWrongPassword() {
+        SysUser user = new SysUser();
+        user.setPassword(passwordEncoder.encode("admin123"));
+        user.setStatus(1);
+        when(userMapper.selectOne(any())).thenReturn(user);
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("admin");
+        request.setPassword("wrong");
+        assertThrows(BusinessException.class, () -> userService.login(request));
+    }
+
+    @Test
+    void register_shouldThrowWhenUsernameExists() {
+        when(userMapper.selectOne(any())).thenReturn(new SysUser());
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("existing");
+        request.setPassword("pass123");
+        assertThrows(BusinessException.class, () -> userService.register(request, "CUSTOMER"));
+    }
+}
+```
+
+- [ ] **Step 11: 创建 Controller 集成测试**
+
+**Files:**
+- Create: `fangdichan-server/src/test/java/com/fdsc/module/user/controller/AuthControllerTest.java`
+
+```java
+package com.fdsc.module.user.controller;
+
+import com.fdsc.common.result.Result;
+import com.fdsc.module.user.dto.LoginRequest;
+import com.fdsc.module.user.dto.LoginResponse;
+import com.fdsc.module.user.service.UserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.bean.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(AuthController.class)
+class AuthControllerTest {
+
+    @Autowired private MockMvc mockMvc;
+    @MockBean private UserService userService;
+    @Autowired private ObjectMapper objectMapper;
+
+    @Test
+    void login_shouldReturn200() throws Exception {
+        when(userService.login(any())).thenReturn(new LoginResponse("token", "ADMIN", 1L));
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("admin");
+        request.setPassword("admin123");
+
+        mockMvc.perform(post("/api/public/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+    }
+}
+```
+
+- [ ] **Step 12: 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS，所有测试通过
+
+- [ ] **Step 13: 启动并测试登录**
 
 Run: `mvn spring-boot:run`，然后用 `curl -X POST http://localhost:8080/api/public/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin123"}'`
 Expected: 返回 200 + token
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
 git add fangdichan-server/src/main/java/com/fdsc/module/user/
+git add fangdichan-server/src/test/java/com/fdsc/module/user/
 git commit -m "feat: implement user auth module (login/register/JWT)"
 ```
 
@@ -1415,11 +1646,20 @@ public class CustomerController {
 Run: `cd fangdichan-server && mvn clean compile -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: 创建 Service 测试**
+
+测试模式参考 Task 6 Step 10（Mock Mapper → 验证业务逻辑），对应测试该任务的 Service 类。
+
+- [ ] **Step 6: 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS，全部测试通过
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add fangdichan-server/src/main/java/com/fdsc/module/user/
-git commit -m "feat: implement customer profile management"
+git add fangdichan-server/src/
+git commit -m "feat: add module and tests"
 ```
 
 ---
@@ -1490,7 +1730,17 @@ public class CustomerCompanyController {
 }
 ```
 
-- [ ] **Step 5: 编译验证 + Commit**
+- [ ] **Step 5: 编译验证**
+
+Run: `cd fangdichan-server && mvn clean compile -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 6: 创建测试 + 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 7: Commit**
 
 ---
 
@@ -1614,7 +1864,19 @@ public class CustomerPropertyController {
 }
 ```
 
-- [ ] **Step 6: 编译验证 + Commit**
+- [ ] **Step 6: 编译验证**
+
+Run: `cd fangdichan-server && mvn clean compile -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 7: 创建测试 + 运行测试**
+
+为该模块核心 Service（PropertyService）编写单元测试，覆盖 createProperty、search、approveProperty 等方法，Mock Mapper 层验证业务逻辑。
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 8: Commit**
 
 ---
 
@@ -1662,7 +1924,17 @@ if (count > 0) {
 ```
 
 - [ ] **Step 3: 创建 Controller**
-- [ ] **Step 4: 编译验证 + Commit**
+- [ ] **Step 4: 编译验证**
+
+Run: `cd fangdichan-server && mvn clean compile -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 5: 创建测试 + 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 6: Commit**
 
 ---
 
@@ -1730,7 +2002,17 @@ public class AdminReportController {
 
 Report 实体：id, propertyId, customerId, reason, status, createdAt, updatedAt
 
-- [ ] **Step 4: 编译验证 + Commit**
+- [ ] **Step 4: 编译验证**
+
+Run: `cd fangdichan-server && mvn clean compile -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 5: 创建测试 + 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 6: Commit**
 
 ---
 
@@ -1816,7 +2098,17 @@ public interface MessageService {
 listConversations 返回时附带各会话的未读计数。
 
 - [ ] **Step 6: 创建客户和房地产商的 Controller**
-- [ ] **Step 7: 编译验证 + Commit**
+- [ ] **Step 7: 编译验证**
+
+Run: `cd fangdichan-server && mvn clean compile -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 8: 创建测试 + 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 9: Commit**
 
 ---
 
@@ -1882,7 +2174,17 @@ public class AnalysisController {
 }
 ```
 
-- [ ] **Step 4: 编译验证 + Commit**
+- [ ] **Step 4: 编译验证**
+
+Run: `cd fangdichan-server && mvn clean compile -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 5: 创建测试 + 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 6: Commit**
 
 ---
 
@@ -1920,9 +2222,20 @@ public class ReportController {
             .body(data);
     }
 }
+}
 ```
 
-- [ ] **Step 3: 编译验证 + Commit**
+- [ ] **Step 3: 编译验证**
+
+Run: `cd fangdichan-server && mvn clean compile -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 4: 创建测试 + 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 5: Commit**
 
 ---
 
@@ -1972,7 +2285,17 @@ public class SystemConfigController {
 }
 ```
 
-- [ ] **Step 4: 编译验证 + Commit**
+- [ ] **Step 4: 编译验证**
+
+Run: `cd fangdichan-server && mvn clean compile -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 5: 创建测试 + 运行测试**
+
+Run: `cd fangdichan-server && mvn test -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 6: Commit**
 
 ---
 
@@ -2559,7 +2882,12 @@ public Result<?> handleAccessDenied(AccessDeniedException e) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: 编译 + 测试验证**
+
+Run: `cd fangdichan-server && mvn clean compile && mvn test -q`
+Expected: BUILD SUCCESS
+
+- [ ] **Step 3: Commit**
 
 ---
 

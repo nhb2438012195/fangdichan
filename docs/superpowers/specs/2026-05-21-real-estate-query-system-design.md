@@ -529,3 +529,28 @@ CREATE TABLE system_config (
 - 服务器运行 fangdichan-server（Spring Boot jar）+ MySQL
 - fangdichan-admin-web 构建为静态文件，由 Nginx 或 Spring Boot 内嵌容器托管
 - fangdichan-client 构建为 Electron 桌面安装包，客户安装后通过 HTTP 远程访问服务器 API
+
+## 12. 测试策略
+
+### 12.1 后端测试
+
+- **框架**: JUnit 5 + Mockito + Spring Boot Test
+- **层次**:
+  - **Service 层单元测试**: Mock Mapper 层，验证业务逻辑和异常分支
+  - **Controller 层集成测试**: 使用 `@WebMvcTest` + MockMvc，Mock Service 层，验证 HTTP 响应和权限控制
+  - **Repository 层测试**: 使用 `@MybatisPlusTest` 或 H2 内嵌数据库验证 SQL
+- **覆盖要求**: 每个 Service 方法至少一个正常路径用例 + 一个异常路径用例
+- **测试目录结构**: `fangdichan-server/src/test/java/com/fdsc/`，与主代码包路径一致
+
+### 12.2 前端测试
+
+- **框架**: Vitest + @vue/test-utils
+- **范围**: 组件渲染测试、用户交互测试
+- **测试目录**: 每个组件同级目录下创建 `*.test.js` 文件
+- **覆盖要求**: 核心业务页面（登录、搜索、详情）至少一个基础渲染测试
+
+### 12.3 测试数据
+
+- Service 层测试使用 Mock 数据
+- Controller 集成测试使用 MockMvc 模拟 HTTP 请求
+- 不依赖外部数据库/服务的测试优先

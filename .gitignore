@@ -24,3 +24,7 @@ Thumbs.db
 
 # Temp
 tmp/
+
+# Claude
+.claude/
+.superpowers/

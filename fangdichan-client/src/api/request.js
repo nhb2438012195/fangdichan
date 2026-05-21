@@ -4,15 +4,15 @@ import router from '../router'
 
 const request = axios.create({ baseURL: '/api' })
 
-request.interceptors.request.use(config => {
+request.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
 request.interceptors.response.use(
-  res => res.data,
-  err => {
+  (res) => res.data,
+  (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
       router.push('/login')

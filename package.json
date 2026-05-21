@@ -1,11 +1,13 @@
 {
+  "scripts": {
+    "lint": "npm run lint --workspace=fangdichan-admin-web && npm run lint --workspace=fangdichan-client",
+    "test": "npm test --workspaces",
+    "prepare": "husky"
+  },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0"
-  },
-  "scripts": {
-    "prepare": "husky"
   }
 }

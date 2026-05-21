@@ -1,0 +1,15 @@
+package com.fdsc.module.favorite.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("favorite")
+public class Favorite {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long customerId;
+    private Long propertyId;
+    private LocalDateTime createdAt;
+}

@@ -1593,33 +1593,28 @@ git commit -m "feat: implement user auth module (login/register/JWT)"
 
 ---
 
-## 阶段三：后端业务模块（以下每个模块为一个 Task）
+## 阶段三：后端业务模块（TDD 模式 — 每个 Task 严格遵循 RED → GREEN → REFACTOR）
 
 ### Task 7: 客户信息管理模块
 
-**Files:**
+**TDD Flow:** RED (测试) → GREEN (实现) → REFACTOR (Controller)
 
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/user/controller/CustomerController.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/user/mapper/CustomerProfileMapper.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/user/service/CustomerProfileService.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/user/service/impl/CustomerProfileServiceImpl.java`
+**Files to create (in TDD order):**
+- Test: `fangdichan-server/src/test/java/com/fdsc/module/user/service/CustomerProfileServiceImplTest.java`
+- Impl: `fangdichan-server/src/main/java/com/fdsc/module/user/service/CustomerProfileService.java`
+- Impl: `fangdichan-server/src/main/java/com/fdsc/module/user/service/impl/CustomerProfileServiceImpl.java`
+- Controller: `fangdichan-server/src/main/java/com/fdsc/module/user/controller/CustomerController.java`
 
-- [ ] **Step 1: 创建 CustomerProfileMapper**
+- [ ] **Step 1 (RED): 创建 CustomerProfileService 接口和测试**
+
+先创建 Service 接口（测试需要 import），然后写测试：
 
 ```java
-package com.fdsc.module.user.mapper;
+// CustomerProfileService.java
+package com.fdsc.module.user.service;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.fdsc.module.user.entity.CustomerProfile;
-import org.apache.ibatis.annotations.Mapper;
 
-@Mapper
-public interface CustomerProfileMapper extends BaseMapper<CustomerProfile> {}
-```
-
-- [ ] **Step 2: 创建 CustomerProfileService + impl**
-
-```java
 public interface CustomerProfileService {
     CustomerProfile getProfile(Long userId);
     void updateProfile(Long userId, CustomerProfile profile);
@@ -1627,56 +1622,227 @@ public interface CustomerProfileService {
 }
 ```
 
-实现中包含：查询个人资料、更新资料、修改密码（验证原密码）。
-
-- [ ] **Step 3: 创建 CustomerController**
-
 ```java
-@RestController
-@RequestMapping("/api/customer/profile")
-public class CustomerController {
-    // GET /api/customer/profile - 获取个人信息(从JWT获取userId)
-    // PUT /api/customer/profile - 更新个人信息
-    // PUT /api/customer/profile/password - 修改密码
+// CustomerProfileServiceImplTest.java
+package com.fdsc.module.user.service;
+
+import com.fdsc.common.exception.BusinessException;
+import com.fdsc.module.user.entity.CustomerProfile;
+import com.fdsc.module.user.entity.SysUser;
+import com.fdsc.module.user.mapper.CustomerProfileMapper;
+import com.fdsc.module.user.mapper.UserMapper;
+import com.fdsc.module.user.service.impl.CustomerProfileServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class CustomerProfileServiceImplTest {
+
+    @Mock private CustomerProfileMapper customerProfileMapper;
+    @Mock private UserMapper userMapper;
+
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private CustomerProfileServiceImpl customerProfileService;
+
+    @BeforeEach
+    void setUp() {
+        customerProfileService = new CustomerProfileServiceImpl(customerProfileMapper, userMapper, passwordEncoder);
+    }
+
+    @Test
+    void getProfile_shouldReturnProfile() {
+        CustomerProfile profile = new CustomerProfile();
+        profile.setUserId(1L);
+        profile.setRealName("张三");
+        when(customerProfileMapper.selectOne(any())).thenReturn(profile);
+
+        CustomerProfile result = customerProfileService.getProfile(1L);
+        assertNotNull(result);
+        assertEquals("张三", result.getRealName());
+    }
+
+    @Test
+    void getProfile_shouldThrowWhenNotFound() {
+        when(customerProfileMapper.selectOne(any())).thenReturn(null);
+        assertThrows(BusinessException.class, () -> customerProfileService.getProfile(1L));
+    }
+
+    @Test
+    void updateProfile_shouldSucceed() {
+        CustomerProfile profile = new CustomerProfile();
+        profile.setRealName("李四");
+        profile.setPhone("13800138000");
+        when(customerProfileMapper.selectOne(any())).thenReturn(new CustomerProfile());
+
+        customerProfileService.updateProfile(1L, profile);
+        verify(customerProfileMapper).update(any(), any());
+    }
+
+    @Test
+    void updatePassword_shouldSucceed() {
+        SysUser user = new SysUser();
+        user.setPassword(passwordEncoder.encode("oldPass"));
+        when(userMapper.selectById(1L)).thenReturn(user);
+
+        customerProfileService.updatePassword(1L, "oldPass", "newPass");
+        verify(userMapper).updateById(any());
+    }
+
+    @Test
+    void updatePassword_shouldThrowWhenOldPasswordWrong() {
+        SysUser user = new SysUser();
+        user.setPassword(passwordEncoder.encode("correctOld"));
+        when(userMapper.selectById(1L)).thenReturn(user);
+
+        assertThrows(BusinessException.class,
+            () -> customerProfileService.updatePassword(1L, "wrongOld", "newPass"));
+    }
 }
 ```
 
-- [ ] **Step 4: 编译验证**
+- [ ] **Step 2 (VERIFY RED): 确认测试失败**
 
-Run: `cd fangdichan-server && mvn clean compile -q`
-Expected: BUILD SUCCESS
+Run: `cd fangdichan-server && mvn test -Dtest=CustomerProfileServiceImplTest -q`
+Expected: 编译失败（CustomerProfileServiceImpl 不存在）
 
-- [ ] **Step 5: 创建 Service 测试**
+- [ ] **Step 3 (GREEN): 创建 CustomerProfileServiceImpl**
 
-测试模式参考 Task 6 Step 10（Mock Mapper → 验证业务逻辑），对应测试该任务的 Service 类。
+```java
+package com.fdsc.module.user.service.impl;
 
-- [ ] **Step 6: 运行测试**
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fdsc.common.exception.BusinessException;
+import com.fdsc.module.user.entity.CustomerProfile;
+import com.fdsc.module.user.entity.SysUser;
+import com.fdsc.module.user.mapper.CustomerProfileMapper;
+import com.fdsc.module.user.mapper.UserMapper;
+import com.fdsc.module.user.service.CustomerProfileService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 
-Run: `cd fangdichan-server && mvn test -q`
+@Service
+@RequiredArgsConstructor
+public class CustomerProfileServiceImpl implements CustomerProfileService {
+    private final CustomerProfileMapper customerProfileMapper;
+    private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
+
+    @Override
+    public CustomerProfile getProfile(Long userId) {
+        CustomerProfile profile = customerProfileMapper.selectOne(
+            new LambdaQueryWrapper<CustomerProfile>().eq(CustomerProfile::getUserId, userId));
+        if (profile == null) throw new BusinessException(404, "个人信息不存在");
+        return profile;
+    }
+
+    @Override
+    public void updateProfile(Long userId, CustomerProfile profile) {
+        CustomerProfile existing = customerProfileMapper.selectOne(
+            new LambdaQueryWrapper<CustomerProfile>().eq(CustomerProfile::getUserId, userId));
+        if (existing == null) throw new BusinessException(404, "个人信息不存在");
+        profile.setId(existing.getId());
+        profile.setUserId(userId);
+        customerProfileMapper.update(profile, new LambdaQueryWrapper<CustomerProfile>().eq(CustomerProfile::getId, existing.getId()));
+    }
+
+    @Override
+    public void updatePassword(Long userId, String oldPassword, String newPassword) {
+        SysUser user = userMapper.selectById(userId);
+        if (user == null || !passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BusinessException(400, "原密码错误");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userMapper.updateById(user);
+    }
+}
+```
+
+- [ ] **Step 4 (VERIFY GREEN): 确认测试通过**
+
+Run: `cd fangdichan-server && mvn test -Dtest=CustomerProfileServiceImplTest -q`
+Expected: BUILD SUCCESS，6 个测试全部通过
+
+- [ ] **Step 5 (REFACTOR): 创建 CustomerController**
+
+```java
+package com.fdsc.module.user.controller;
+
+import com.fdsc.common.result.Result;
+import com.fdsc.module.user.entity.CustomerProfile;
+import com.fdsc.module.user.service.CustomerProfileService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/customer/profile")
+@RequiredArgsConstructor
+public class CustomerController {
+    private final CustomerProfileService customerProfileService;
+
+    @GetMapping
+    public Result<CustomerProfile> getProfile(@AuthenticationPrincipal Long userId) {
+        return Result.success(customerProfileService.getProfile(userId));
+    }
+
+    @PutMapping
+    public Result<?> updateProfile(@AuthenticationPrincipal Long userId, @RequestBody CustomerProfile profile) {
+        customerProfileService.updateProfile(userId, profile);
+        return Result.success(null);
+    }
+
+    @PutMapping("/password")
+    public Result<?> updatePassword(@AuthenticationPrincipal Long userId,
+                                     @RequestParam String oldPassword,
+                                     @RequestParam String newPassword) {
+        customerProfileService.updatePassword(userId, oldPassword, newPassword);
+        return Result.success(null);
+    }
+}
+```
+
+- [ ] **Step 6: 编译验证 + 全量测试**
+
+Run: `cd fangdichan-server && mvn clean test -q`
 Expected: BUILD SUCCESS，全部测试通过
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add fangdichan-server/src/
-git commit -m "feat: add module and tests"
+git add fangdichan-server/src/main/java/com/fdsc/module/user/service/CustomerProfileService.java \
+        fangdichan-server/src/main/java/com/fdsc/module/user/service/impl/CustomerProfileServiceImpl.java \
+        fangdichan-server/src/main/java/com/fdsc/module/user/controller/CustomerController.java \
+        fangdichan-server/src/test/java/com/fdsc/module/user/service/CustomerProfileServiceImplTest.java
+git commit -m "feat: add customer profile module (TDD)"
 ```
 
 ---
 
 ### Task 8: 房地产公司模块
 
-**Files:**
+**TDD Flow:** RED → GREEN → REFACTOR
 
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/company/entity/Company.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/company/mapper/CompanyMapper.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/company/service/CompanyService.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/company/service/impl/CompanyServiceImpl.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/company/controller/CompanyController.java`
+**Files to create (in TDD order):**
+- Test: `fangdichan-server/src/test/java/com/fdsc/module/company/service/CompanyServiceImplTest.java`
+- Entity: `fangdichan-server/src/main/java/com/fdsc/module/company/entity/Company.java`
+- Mapper: `fangdichan-server/src/main/java/com/fdsc/module/company/mapper/CompanyMapper.java`
+- Service/Impl: `fangdichan-server/src/main/java/com/fdsc/module/company/service/CompanyService.java`, `.../impl/CompanyServiceImpl.java`
+- Controller: `fangdichan-server/src/main/java/com/fdsc/module/company/controller/AgentCompanyController.java`, `CustomerCompanyController.java`
 
-- [ ] **Step 1: 创建 Company 实体**
+- [ ] **Step 1 (RED): 先创建实体 + Mapper，再写测试**
 
 ```java
+// Company.java
 @Data
 @TableName("company")
 public class Company {
@@ -1692,16 +1858,14 @@ public class Company {
 }
 ```
 
-- [ ] **Step 2: 创建 CompanyMapper**
-
 ```java
+// CompanyMapper.java
 @Mapper
 public interface CompanyMapper extends BaseMapper<Company> {}
 ```
 
-- [ ] **Step 3: 创建 CompanyService + impl**
-
 ```java
+// CompanyService.java
 public interface CompanyService {
     Company getCompanyByUserId(Long userId);
     Company getCompanyById(Long id);
@@ -1710,191 +1874,654 @@ public interface CompanyService {
 }
 ```
 
-- [ ] **Step 4: 创建两个 Controller**
-
 ```java
-// AgentController - 房地产商自己管理公司
-@RestController
-@RequestMapping("/api/agent/company")
-public class AgentCompanyController {
-    // GET /api/agent/company - 获取自己的公司信息
-    // PUT /api/agent/company - 更新公司信息
-}
+// CompanyServiceImplTest.java
+package com.fdsc.module.company.service;
 
-// CustomerCompanyController - 客户查看公司信息
-@RestController
-@RequestMapping("/api/customer/company")
-public class CustomerCompanyController {
-    // GET /api/customer/company/list - 所有公司列表
-    // GET /api/customer/company/{id} - 公司详情
+import com.fdsc.common.exception.BusinessException;
+import com.fdsc.module.company.entity.Company;
+import com.fdsc.module.company.mapper.CompanyMapper;
+import com.fdsc.module.company.service.impl.CompanyServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class CompanyServiceImplTest {
+
+    @Mock private CompanyMapper companyMapper;
+    private CompanyServiceImpl companyService;
+
+    @BeforeEach
+    void setUp() {
+        companyService = new CompanyServiceImpl(companyMapper);
+    }
+
+    @Test
+    void getCompanyByUserId_shouldReturnCompany() {
+        Company company = new Company();
+        company.setId(1L);
+        company.setCompanyName("测试公司");
+        when(companyMapper.selectOne(any())).thenReturn(company);
+
+        Company result = companyService.getCompanyByUserId(1L);
+        assertNotNull(result);
+        assertEquals("测试公司", result.getCompanyName());
+    }
+
+    @Test
+    void getCompanyByUserId_shouldThrowWhenNotFound() {
+        when(companyMapper.selectOne(any())).thenReturn(null);
+        assertThrows(BusinessException.class, () -> companyService.getCompanyByUserId(1L));
+    }
+
+    @Test
+    void getCompanyById_shouldReturnCompany() {
+        Company company = new Company();
+        company.setId(1L);
+        when(companyMapper.selectById(1L)).thenReturn(company);
+
+        Company result = companyService.getCompanyById(1L);
+        assertNotNull(result);
+    }
+
+    @Test
+    void updateCompany_shouldSucceed() {
+        when(companyMapper.selectOne(any())).thenReturn(new Company());
+
+        Company update = new Company();
+        update.setCompanyName("新名称");
+        companyService.updateCompany(1L, update);
+        verify(companyMapper).update(any(), any());
+    }
+
+    @Test
+    void listAll_shouldReturnList() {
+        when(companyMapper.selectList(any())).thenReturn(List.of(new Company(), new Company()));
+        assertEquals(2, companyService.listAll().size());
+    }
 }
 ```
 
-- [ ] **Step 5: 编译验证**
+- [ ] **Step 2 (VERIFY RED): 确认测试失败**
 
-Run: `cd fangdichan-server && mvn clean compile -q`
-Expected: BUILD SUCCESS
+Run: `cd fangdichan-server && mvn test -Dtest=CompanyServiceImplTest -q`
+Expected: 编译失败（CompanyServiceImpl 不存在）
 
-- [ ] **Step 6: 创建测试 + 运行测试**
+- [ ] **Step 3 (GREEN): 创建 CompanyServiceImpl**
 
-Run: `cd fangdichan-server && mvn test -q`
+```java
+package com.fdsc.module.company.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fdsc.common.exception.BusinessException;
+import com.fdsc.module.company.entity.Company;
+import com.fdsc.module.company.mapper.CompanyMapper;
+import com.fdsc.module.company.service.CompanyService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class CompanyServiceImpl implements CompanyService {
+    private final CompanyMapper companyMapper;
+
+    @Override
+    public Company getCompanyByUserId(Long userId) {
+        Company company = companyMapper.selectOne(
+            new LambdaQueryWrapper<Company>().eq(Company::getUserId, userId));
+        if (company == null) throw new BusinessException(404, "公司信息不存在");
+        return company;
+    }
+
+    @Override
+    public Company getCompanyById(Long id) {
+        Company company = companyMapper.selectById(id);
+        if (company == null) throw new BusinessException(404, "公司不存在");
+        return company;
+    }
+
+    @Override
+    public void updateCompany(Long userId, Company company) {
+        Company existing = companyMapper.selectOne(
+            new LambdaQueryWrapper<Company>().eq(Company::getUserId, userId));
+        if (existing == null) throw new BusinessException(404, "公司信息不存在");
+        company.setId(existing.getId());
+        company.setUserId(userId);
+        companyMapper.update(company, new LambdaQueryWrapper<Company>().eq(Company::getId, existing.getId()));
+    }
+
+    @Override
+    public List<Company> listAll() {
+        return companyMapper.selectList(null);
+    }
+}
+```
+
+- [ ] **Step 4 (VERIFY GREEN): 确认测试通过**
+
+Run: `cd fangdichan-server && mvn test -Dtest=CompanyServiceImplTest -q`
+Expected: BUILD SUCCESS，6 个测试全部通过
+
+- [ ] **Step 5 (REFACTOR): 创建 Controller**
+
+```java
+@RestController
+@RequestMapping("/api/agent/company")
+@RequiredArgsConstructor
+public class AgentCompanyController {
+    private final CompanyService companyService;
+
+    @GetMapping
+    public Result<Company> getMyCompany(@AuthenticationPrincipal Long userId) {
+        return Result.success(companyService.getCompanyByUserId(userId));
+    }
+
+    @PutMapping
+    public Result<?> updateCompany(@AuthenticationPrincipal Long userId, @RequestBody Company company) {
+        companyService.updateCompany(userId, company);
+        return Result.success(null);
+    }
+}
+```
+
+```java
+@RestController
+@RequestMapping("/api/customer/company")
+@RequiredArgsConstructor
+public class CustomerCompanyController {
+    private final CompanyService companyService;
+
+    @GetMapping("/list")
+    public Result<List<Company>> listAll() {
+        return Result.success(companyService.listAll());
+    }
+
+    @GetMapping("/{id}")
+    public Result<Company> getDetail(@PathVariable Long id) {
+        return Result.success(companyService.getCompanyById(id));
+    }
+}
+```
+
+- [ ] **Step 6: 编译验证 + 全量测试**
+
+Run: `cd fangdichan-server && mvn clean test -q`
 Expected: BUILD SUCCESS
 
 - [ ] **Step 7: Commit**
+
+```bash
+git add fangdichan-server/src/main/java/com/fdsc/module/company/ \
+        fangdichan-server/src/test/java/com/fdsc/module/company/
+git commit -m "feat: add company module (TDD)"
+```
 
 ---
 
 ### Task 9: 房源模块（CRUD + 审核流程 + 图片上传）
 
-**Files:**
+**TDD Flow:** RED → GREEN → REFACTOR
 
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/property/entity/Property.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/property/entity/PropertyImage.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/property/mapper/PropertyMapper.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/property/mapper/PropertyImageMapper.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/property/service/PropertyService.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/property/service/impl/PropertyServiceImpl.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/property/controller/AgentPropertyController.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/property/controller/AdminPropertyController.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/property/controller/CustomerPropertyController.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/common/config/MinioConfig.java`
+**Files to create (in TDD order):**
+- Entity: `fangdichan-server/src/main/java/com/fdsc/module/property/entity/Property.java`
+- Entity: `fangdichan-server/src/main/java/com/fdsc/module/property/entity/PropertyImage.java`
+- Mapper: `fangdichan-server/src/main/java/com/fdsc/module/property/mapper/PropertyMapper.java`
+- Mapper: `fangdichan-server/src/main/java/com/fdsc/module/property/mapper/PropertyImageMapper.java`
+- Service/Impl + Test
+- MinioConfig: `fangdichan-server/src/main/java/com/fdsc/common/config/MinioConfig.java`
+- Controllers (AgentPropertyController, AdminPropertyController, CustomerPropertyController)
 
-- [ ] **Step 1: 创建 Property / PropertyImage 实体**
-
-Property 字段映射所有表字段。注意 `unit_price` 在 setter 或 service 中自动计算：`price / area`。
-
-- [ ] **Step 2: 创建 PropertyMapper / PropertyImageMapper（BaseMapper）**
-- [ ] **Step 3: 创建 MinioConfig**
+- [ ] **Step 1 (RED): 创建实体、Mapper 和测试**
 
 ```java
-package com.fdsc.common.config;
+// Property.java
+@Data
+@TableName("property")
+public class Property {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long companyId;
+    private String title;
+    private String location;
+    private String district;
+    private String floor;
+    private Integer floorTotal;
+    private String roomType;
+    private BigDecimal area;
+    private BigDecimal price;
+    private BigDecimal unitPrice;
+    private Boolean isVacant;
+    private String status;
+    private String description;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
-import io.minio.BucketExistsArgs;
-import io.minio.MakeBucketArgs;
-import io.minio.MinioClient;
-import jakarta.annotation.PostConstruct;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-@Slf4j
-@Configuration
-public class MinioConfig {
-    @Value("${minio.endpoint}")
-    private String endpoint;
-    @Value("${minio.access-key}")
-    private String accessKey;
-    @Value("${minio.secret-key}")
-    private String secretKey;
-    @Value("${minio.bucket-name}")
-    private String bucketName;
-
-    @Bean
-    public MinioClient minioClient() {
-        return MinioClient.builder()
-                .endpoint(endpoint)
-                .credentials(accessKey, secretKey)
-                .build();
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+        if (this.area != null && price != null && this.area.compareTo(BigDecimal.ZERO) > 0) {
+            this.unitPrice = price.divide(this.area, 2, RoundingMode.HALF_UP);
+        }
     }
 
-    @PostConstruct
-    public void initBucket() {
-        try {
-            MinioClient client = minioClient();
-            if (!client.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build())) {
-                client.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
-                log.info("✅ MinIO bucket '{}' 已自动创建", bucketName);
-            }
-        } catch (Exception e) {
-            log.warn("⚠️ MinIO bucket 初始化失败: {}", e.getMessage());
+    public void setArea(BigDecimal area) {
+        this.area = area;
+        if (this.price != null && area != null && area.compareTo(BigDecimal.ZERO) > 0) {
+            this.unitPrice = this.price.divide(area, 2, RoundingMode.HALF_UP);
         }
     }
 }
 ```
 
-- [ ] **Step 4: 创建 PropertyService**
-
-包含方法：
-
-- `createProperty(Long companyId, Property property)` — 创建房源，初始 status=PENDING
-- `updateProperty(Long companyId, Long propertyId, Property property)` — 修改
-- `setOffMarket(Long companyId, Long propertyId)` — 下架
-- `approveProperty(Long adminId, Long propertyId)` — 管理员审核通过
-- `rejectProperty(Long adminId, Long propertyId)` — 管理员审核拒绝
-- `listByCompany(Long companyId, int page, int size)` — 某公司房源分页
-- `search(String keyword, String district, String roomType, BigDecimal priceMin, BigDecimal priceMax, BigDecimal areaMin, BigDecimal areaMax, int page, int size)` — 客户搜索（动态 WHERE，keyword 模糊匹配 title 和 location 字段）
-- `getDetail(Long propertyId)` — 房源详情（含图片列表）
-- `uploadImage(MultipartFile file)` — 上传到 MinIO，返回 URL
-- `deleteImage(Long imageId)` — 删除图片
-
-- [ ] **Step 5: 创建图片上传控制器**
-
 ```java
-@RestController
-@RequestMapping("/api/agent/property")
-public class AgentPropertyController {
-    // CRUD 房源、上传/删除图片
-    // POST /api/agent/property - 创建
-    // PUT /api/agent/property/{id} - 修改
-    // PUT /api/agent/property/{id}/off-market - 下架
-    // GET /api/agent/property/list - 我的房源列表
-    // POST /api/agent/property/image/upload - 上传图片
-    // DELETE /api/agent/property/image/{id} - 删除图片
+// PropertyImage.java
+@Data
+@TableName("property_image")
+public class PropertyImage {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long propertyId;
+    private String imageUrl;
+    private Integer sortOrder;
+    private LocalDateTime createdAt;
 }
 ```
 
 ```java
-@RestController
-@RequestMapping("/api/admin/property")
-public class AdminPropertyController {
-    // GET /api/admin/property/pending - 待审核列表
-    // PUT /api/admin/property/{id}/approve - 通过
-    // PUT /api/admin/property/{id}/reject - 拒绝
+// PropertyMapper.java
+@Mapper
+public interface PropertyMapper extends BaseMapper<Property> {}
+```
+
+```java
+// PropertyImageMapper.java
+@Mapper
+public interface PropertyImageMapper extends BaseMapper<PropertyImage> {}
+```
+
+```java
+// PropertyService.java
+public interface PropertyService {
+    void createProperty(Long companyId, Property property);
+    void updateProperty(Long companyId, Long propertyId, Property property);
+    void setOffMarket(Long companyId, Long propertyId);
+    void approveProperty(Long adminId, Long propertyId);
+    void rejectProperty(Long adminId, Long propertyId);
+    PageResult<Property> listByCompany(Long companyId, int page, int size);
+    PageResult<Property> search(String keyword, String district, String roomType,
+                                BigDecimal priceMin, BigDecimal priceMax,
+                                BigDecimal areaMin, BigDecimal areaMax, int page, int size);
+    Property getDetail(Long propertyId);
+    String uploadImage(MultipartFile file);
+    void deleteImage(Long imageId);
 }
 ```
 
 ```java
-@RestController
-@RequestMapping("/api/customer/property")
-public class CustomerPropertyController {
-    // GET /api/customer/property/search - 搜索（带分页和筛选参数）
-    // GET /api/customer/property/{id} - 详情
-    // GET /api/customer/property/recommended - 首页推荐
+// PropertyServiceImplTest.java
+package com.fdsc.module.property.service;
+
+import com.fdsc.common.exception.BusinessException;
+import com.fdsc.module.property.entity.Property;
+import com.fdsc.module.property.mapper.PropertyImageMapper;
+import com.fdsc.module.property.mapper.PropertyMapper;
+import com.fdsc.module.property.service.impl.PropertyServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class PropertyServiceImplTest {
+
+    @Mock private PropertyMapper propertyMapper;
+    @Mock private PropertyImageMapper propertyImageMapper;
+    @Mock private MinioClient minioClient;
+
+    private PropertyServiceImpl propertyService;
+
+    @BeforeEach
+    void setUp() {
+        propertyService = new PropertyServiceImpl(propertyMapper, propertyImageMapper, minioClient);
+    }
+
+    @Test
+    void createProperty_shouldSetPendingStatus() {
+        Property property = new Property();
+        property.setTitle("测试房源");
+        property.setLocation("朝阳区");
+        property.setRoomType("三室");
+        property.setPrice(new BigDecimal("5000000"));
+        property.setArea(new BigDecimal("100"));
+
+        propertyService.createProperty(1L, property);
+        assertEquals("PENDING", property.getStatus());
+        assertEquals(1L, property.getCompanyId());
+        // unitPrice = 5000000/100 = 50000.00
+        assertEquals(0, new BigDecimal("50000.00").compareTo(property.getUnitPrice()));
+        verify(propertyMapper).insert(property);
+    }
+
+    @Test
+    void approveProperty_shouldChangeStatus() {
+        Property property = new Property();
+        property.setId(1L);
+        property.setStatus("PENDING");
+        when(propertyMapper.selectById(1L)).thenReturn(property);
+
+        propertyService.approveProperty(10L, 1L);
+
+        assertEquals("APPROVED", property.getStatus());
+        verify(propertyMapper).updateById(property);
+    }
+
+    @Test
+    void approveProperty_shouldThrowWhenNotPending() {
+        Property property = new Property();
+        property.setStatus("APPROVED");
+        when(propertyMapper.selectById(1L)).thenReturn(property);
+
+        assertThrows(BusinessException.class, () -> propertyService.approveProperty(10L, 1L));
+    }
+
+    @Test
+    void rejectProperty_shouldChangeStatus() {
+        Property property = new Property();
+        property.setId(1L);
+        property.setStatus("PENDING");
+        when(propertyMapper.selectById(1L)).thenReturn(property);
+
+        propertyService.rejectProperty(10L, 1L);
+        assertEquals("REJECTED", property.getStatus());
+    }
+
+    @Test
+    void setOffMarket_shouldChangeStatus() {
+        Property property = new Property();
+        property.setCompanyId(1L);
+        property.setStatus("APPROVED");
+        when(propertyMapper.selectById(1L)).thenReturn(property);
+
+        propertyService.setOffMarket(1L, 1L);
+        assertEquals("OFF_MARKET", property.getStatus());
+    }
+
+    @Test
+    void setOffMarket_shouldThrowWhenWrongCompany() {
+        Property property = new Property();
+        property.setCompanyId(2L);
+        when(propertyMapper.selectById(1L)).thenReturn(property);
+
+        assertThrows(BusinessException.class, () -> propertyService.setOffMarket(1L, 1L));
+    }
+
+    @Test
+    void search_shouldReturnResults() {
+        Property p = new Property();
+        p.setTitle("朝阳区好房");
+        when(propertyMapper.selectPage(any(), any())).thenReturn(
+            new com.baomidou.mybatisplus.extension.plugins.pagination.Page<Property>() {{
+                setRecords(List.of(p));
+                setTotal(1);
+            }}
+        );
+
+        var result = propertyService.search("朝阳", "朝阳区", "三室",
+            null, null, null, null, 1, 10);
+        assertEquals(1, result.getList().size());
+    }
+
+    @Test
+    void createProperty_shouldThrowWhenPriceNegative() {
+        Property property = new Property();
+        property.setPrice(new BigDecimal("-100"));
+        property.setArea(new BigDecimal("100"));
+
+        assertThrows(BusinessException.class, () -> propertyService.createProperty(1L, property));
+    }
 }
 ```
 
-- [ ] **Step 6: 编译验证**
+- [ ] **Step 2 (VERIFY RED): 确认测试失败**
 
-Run: `cd fangdichan-server && mvn clean compile -q`
+Run: `cd fangdichan-server && mvn test -Dtest=PropertyServiceImplTest -q`
+Expected: 编译失败（PropertyServiceImpl 不存在）
+
+- [ ] **Step 3 (GREEN): 创建 PropertyServiceImpl**
+
+```java
+package com.fdsc.module.property.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fdsc.common.exception.BusinessException;
+import com.fdsc.common.result.PageResult;
+import com.fdsc.module.property.entity.Property;
+import com.fdsc.module.property.entity.PropertyImage;
+import com.fdsc.module.property.mapper.PropertyImageMapper;
+import com.fdsc.module.property.mapper.PropertyMapper;
+import com.fdsc.module.property.service.PropertyService;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class PropertyServiceImpl implements PropertyService {
+    private final PropertyMapper propertyMapper;
+    private final PropertyImageMapper propertyImageMapper;
+    private final MinioClient minioClient;
+
+    @Override
+    public void createProperty(Long companyId, Property property) {
+        if (property.getPrice() != null && property.getPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException(400, "价格不能为负数");
+        }
+        property.setCompanyId(companyId);
+        property.setStatus("PENDING");
+        property.setIsVacant(true);
+        propertyMapper.insert(property);
+    }
+
+    @Override
+    public void updateProperty(Long companyId, Long propertyId, Property property) {
+        Property existing = propertyMapper.selectById(propertyId);
+        if (existing == null || !existing.getCompanyId().equals(companyId)) {
+            throw new BusinessException(404, "房源不存在");
+        }
+        property.setId(propertyId);
+        property.setCompanyId(companyId);
+        property.setUnitPrice(null); // 重新计算
+        propertyMapper.updateById(property);
+    }
+
+    @Override
+    public void setOffMarket(Long companyId, Long propertyId) {
+        Property property = propertyMapper.selectById(propertyId);
+        if (property == null || !property.getCompanyId().equals(companyId)) {
+            throw new BusinessException(404, "房源不存在");
+        }
+        property.setStatus("OFF_MARKET");
+        propertyMapper.updateById(property);
+    }
+
+    @Override
+    public void approveProperty(Long adminId, Long propertyId) {
+        Property property = propertyMapper.selectById(propertyId);
+        if (property == null || !"PENDING".equals(property.getStatus())) {
+            throw new BusinessException(400, "该房源不在待审核状态");
+        }
+        property.setStatus("APPROVED");
+        propertyMapper.updateById(property);
+    }
+
+    @Override
+    public void rejectProperty(Long adminId, Long propertyId) {
+        Property property = propertyMapper.selectById(propertyId);
+        if (property == null || !"PENDING".equals(property.getStatus())) {
+            throw new BusinessException(400, "该房源不在待审核状态");
+        }
+        property.setStatus("REJECTED");
+        propertyMapper.updateById(property);
+    }
+
+    @Override
+    public PageResult<Property> listByCompany(Long companyId, int page, int size) {
+        Page<Property> p = propertyMapper.selectPage(new Page<>(page, size),
+            new LambdaQueryWrapper<Property>().eq(Property::getCompanyId, companyId));
+        return PageResult.of(p.getRecords(), page, size, p.getTotal());
+    }
+
+    @Override
+    public PageResult<Property> search(String keyword, String district, String roomType,
+                                        BigDecimal priceMin, BigDecimal priceMax,
+                                        BigDecimal areaMin, BigDecimal areaMax, int page, int size) {
+        LambdaQueryWrapper<Property> qw = new LambdaQueryWrapper<Property>()
+            .eq(Property::getStatus, "APPROVED");
+        if (keyword != null) qw.and(w -> w.like(Property::getTitle, keyword).or().like(Property::getLocation, keyword));
+        if (district != null) qw.eq(Property::getDistrict, district);
+        if (roomType != null) qw.eq(Property::getRoomType, roomType);
+        if (priceMin != null) qw.ge(Property::getPrice, priceMin);
+        if (priceMax != null) qw.le(Property::getPrice, priceMax);
+        if (areaMin != null) qw.ge(Property::getArea, areaMin);
+        if (areaMax != null) qw.le(Property::getArea, areaMax);
+        Page<Property> p = propertyMapper.selectPage(new Page<>(page, size), qw);
+        return PageResult.of(p.getRecords(), page, size, p.getTotal());
+    }
+
+    @Override
+    public Property getDetail(Long propertyId) {
+        Property property = propertyMapper.selectById(propertyId);
+        if (property == null) throw new BusinessException(404, "房源不存在");
+        return property;
+    }
+
+    @Override
+    public String uploadImage(MultipartFile file) {
+        try {
+            String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            minioClient.putObject(PutObjectArgs.builder()
+                .bucket("fangdichan")
+                .object(filename)
+                .stream(file.getInputStream(), file.getSize(), -1)
+                .contentType(file.getContentType())
+                .build());
+            return "/api/image/" + filename;
+        } catch (Exception e) {
+            throw new BusinessException(500, "图片上传失败");
+        }
+    }
+
+    @Override
+    public void deleteImage(Long imageId) {
+        propertyImageMapper.deleteById(imageId);
+    }
+}
+```
+
+- [ ] **Step 4 (VERIFY GREEN): 确认测试通过**
+
+Run: `cd fangdichan-server && mvn test -Dtest=PropertyServiceImplTest -q`
+Expected: BUILD SUCCESS，8 个测试全部通过
+
+- [ ] **Step 5 (REFACTOR): 创建 MinioConfig 和 Controllers**
+
+```java
+// MinioConfig.java
+@Configuration
+public class MinioConfig {
+    @Value("${minio.endpoint}") private String endpoint;
+    @Value("${minio.access-key}") private String accessKey;
+    @Value("${minio.secret-key}") private String secretKey;
+    @Value("${minio.bucket-name}") private String bucketName;
+
+    @Bean
+    public MinioClient minioClient() {
+        return MinioClient.builder().endpoint(endpoint).credentials(accessKey, secretKey).build();
+    }
+}
+```
+
+AgentPropertyController — POST/PUT 房源、上传/删除图片
+AdminPropertyController — 审核房源
+CustomerPropertyController — 搜索、详情
+
+- [ ] **Step 6: 编译验证 + 全量测试**
+
+Run: `cd fangdichan-server && mvn clean test -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 7: 创建测试 + 运行测试**
+- [ ] **Step 7: Commit**
 
-为该模块核心 Service（PropertyService）编写单元测试，覆盖 createProperty、search、approveProperty 等方法，Mock Mapper 层验证业务逻辑。
-
-Run: `cd fangdichan-server && mvn test -q`
-Expected: BUILD SUCCESS
-
-- [ ] **Step 8: Commit**
+```bash
+git add fangdichan-server/src/main/java/com/fdsc/module/property/ \
+        fangdichan-server/src/main/java/com/fdsc/common/config/MinioConfig.java \
+        fangdichan-server/src/test/java/com/fdsc/module/property/
+git commit -m "feat: add property module with approval workflow (TDD)"
+```
 
 ---
 
 ### Task 10: 购房订单模块
 
-**Files:**
+**TDD Flow:** RED → GREEN → REFACTOR
 
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/order/entity/PurchaseOrder.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/order/mapper/PurchaseOrderMapper.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/order/service/PurchaseOrderService.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/order/service/impl/PurchaseOrderServiceImpl.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/order/controller/CustomerOrderController.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/order/controller/AgentOrderController.java`
+**Files to create (in TDD order):**
+- Entity: `fangdichan-server/src/main/java/com/fdsc/module/order/entity/PurchaseOrder.java`
+- Mapper: `fangdichan-server/src/main/java/com/fdsc/module/order/mapper/PurchaseOrderMapper.java`
+- Service/Impl + Test
+- Controllers
 
-- [ ] **Step 1: 创建实体 + Mapper**
-- [ ] **Step 2: 创建 Service**
+- [ ] **Step 1 (RED): 创建实体、Mapper 和测试**
 
 ```java
+// PurchaseOrder.java
+@Data
+@TableName("purchase_order")
+public class PurchaseOrder {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private String orderNo;
+    private Long customerId;
+    private Long propertyId;
+    private String status;
+    private String message;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+```
+
+```java
+// PurchaseOrderMapper.java
+@Mapper
+public interface PurchaseOrderMapper extends BaseMapper<PurchaseOrder> {}
+```
+
+```java
+// PurchaseOrderService.java
 public interface PurchaseOrderService {
     void createOrder(Long customerId, Long propertyId, String message);
     void confirmOrder(Long agentId, Long orderId);
@@ -1904,187 +2531,464 @@ public interface PurchaseOrderService {
 }
 ```
 
-流程：客户提交 → 检查房源状态为 `APPROVED` 且无其他 `PENDING` 或 `CONFIRMED` 订单 → 创建 `PENDING` 订单 → 房地产商确认 → 状态变为 `CONFIRMED`，同时房源标记 `SOLD`
-
-`createOrder` 实现中的检查逻辑：
 ```java
-// 检查房源状态
-Property property = propertyMapper.selectById(propertyId);
-if (property == null || !"APPROVED".equals(property.getStatus())) {
-    throw new BusinessException(400, "该房源不可购买");
-}
-// 检查是否有其他待处理订单
-Long count = purchaseOrderMapper.selectCount(
-    new LambdaQueryWrapper<PurchaseOrder>()
-        .eq(PurchaseOrder::getPropertyId, propertyId)
-        .in(PurchaseOrder::getStatus, "PENDING", "CONFIRMED"));
-if (count > 0) {
-    throw new BusinessException(400, "该房源已有客户在交易中");
+// PurchaseOrderServiceImplTest.java
+package com.fdsc.module.order.service;
+
+import com.fdsc.common.exception.BusinessException;
+import com.fdsc.module.order.entity.PurchaseOrder;
+import com.fdsc.module.order.mapper.PurchaseOrderMapper;
+import com.fdsc.module.order.service.impl.PurchaseOrderServiceImpl;
+import com.fdsc.module.property.entity.Property;
+import com.fdsc.module.property.mapper.PropertyMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class PurchaseOrderServiceImplTest {
+
+    @Mock private PurchaseOrderMapper purchaseOrderMapper;
+    @Mock private PropertyMapper propertyMapper;
+    private PurchaseOrderServiceImpl purchaseOrderService;
+
+    @BeforeEach
+    void setUp() {
+        purchaseOrderService = new PurchaseOrderServiceImpl(purchaseOrderMapper, propertyMapper);
+    }
+
+    @Test
+    void createOrder_shouldSucceed() {
+        Property property = new Property();
+        property.setId(1L);
+        property.setStatus("APPROVED");
+        when(propertyMapper.selectById(1L)).thenReturn(property);
+        when(purchaseOrderMapper.selectCount(any())).thenReturn(0L);
+        when(purchaseOrderMapper.insert(any())).thenReturn(1);
+
+        purchaseOrderService.createOrder(100L, 1L, "我想购买");
+        verify(purchaseOrderMapper).insert(any());
+    }
+
+    @Test
+    void createOrder_shouldThrowWhenPropertyNotApproved() {
+        Property property = new Property();
+        property.setStatus("PENDING");
+        when(propertyMapper.selectById(1L)).thenReturn(property);
+
+        assertThrows(BusinessException.class,
+            () -> purchaseOrderService.createOrder(100L, 1L, "消息"));
+    }
+
+    @Test
+    void createOrder_shouldThrowWhenOtherOrderExists() {
+        Property property = new Property();
+        property.setId(1L);
+        property.setStatus("APPROVED");
+        when(propertyMapper.selectById(1L)).thenReturn(property);
+        when(purchaseOrderMapper.selectCount(any())).thenReturn(1L);
+
+        assertThrows(BusinessException.class,
+            () -> purchaseOrderService.createOrder(100L, 1L, "消息"));
+    }
+
+    @Test
+    void confirmOrder_shouldSucceed() {
+        PurchaseOrder order = new PurchaseOrder();
+        order.setId(1L);
+        order.setStatus("PENDING");
+        when(purchaseOrderMapper.selectById(1L)).thenReturn(order);
+
+        Property property = new Property();
+        property.setId(1L);
+        when(propertyMapper.selectById(any())).thenReturn(property);
+
+        purchaseOrderService.confirmOrder(10L, 1L);
+        assertEquals("CONFIRMED", order.getStatus());
+        assertFalse(property.getIsVacant());
+    }
+
+    @Test
+    void cancelOrder_shouldSucceed() {
+        PurchaseOrder order = new PurchaseOrder();
+        order.setId(1L);
+        order.setStatus("PENDING");
+        order.setCustomerId(100L);
+        when(purchaseOrderMapper.selectById(1L)).thenReturn(order);
+
+        purchaseOrderService.cancelOrder(100L, 1L, "CUSTOMER");
+        assertEquals("CANCELLED", order.getStatus());
+    }
 }
 ```
 
-- [ ] **Step 3: 创建 Controller**
-- [ ] **Step 4: 编译验证**
+- [ ] **Step 2 (VERIFY RED): 确认测试失败**
 
-Run: `cd fangdichan-server && mvn clean compile -q`
+Run: `cd fangdichan-server && mvn test -Dtest=PurchaseOrderServiceImplTest -q`
+Expected: 编译失败
+
+- [ ] **Step 3 (GREEN): 创建 PurchaseOrderServiceImpl**
+
+```java
+package com.fdsc.module.order.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fdsc.common.exception.BusinessException;
+import com.fdsc.common.result.PageResult;
+import com.fdsc.module.order.entity.PurchaseOrder;
+import com.fdsc.module.order.mapper.PurchaseOrderMapper;
+import com.fdsc.module.order.service.PurchaseOrderService;
+import com.fdsc.module.property.entity.Property;
+import com.fdsc.module.property.mapper.PropertyMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.ThreadLocalRandom;
+
+@Service
+@RequiredArgsConstructor
+public class PurchaseOrderServiceImpl implements PurchaseOrderService {
+    private final PurchaseOrderMapper purchaseOrderMapper;
+    private final PropertyMapper propertyMapper;
+
+    @Override
+    public void createOrder(Long customerId, Long propertyId, String message) {
+        Property property = propertyMapper.selectById(propertyId);
+        if (property == null || !"APPROVED".equals(property.getStatus())) {
+            throw new BusinessException(400, "该房源不可购买");
+        }
+        Long count = purchaseOrderMapper.selectCount(
+            new LambdaQueryWrapper<PurchaseOrder>()
+                .eq(PurchaseOrder::getPropertyId, propertyId)
+                .in(PurchaseOrder::getStatus, "PENDING", "CONFIRMED"));
+        if (count > 0) {
+            throw new BusinessException(400, "该房源已有客户在交易中");
+        }
+        PurchaseOrder order = new PurchaseOrder();
+        order.setOrderNo(generateOrderNo());
+        order.setCustomerId(customerId);
+        order.setPropertyId(propertyId);
+        order.setStatus("PENDING");
+        order.setMessage(message);
+        purchaseOrderMapper.insert(order);
+    }
+
+    @Override
+    public void confirmOrder(Long agentId, Long orderId) {
+        PurchaseOrder order = purchaseOrderMapper.selectById(orderId);
+        if (order == null || !"PENDING".equals(order.getStatus())) {
+            throw new BusinessException(400, "订单状态异常");
+        }
+        order.setStatus("CONFIRMED");
+        purchaseOrderMapper.updateById(order);
+
+        Property property = propertyMapper.selectById(order.getPropertyId());
+        if (property != null) {
+            property.setIsVacant(false);
+            property.setStatus("SOLD");
+            property.setUnitPrice(null); // 重新计算
+            propertyMapper.updateById(property);
+        }
+    }
+
+    @Override
+    public void cancelOrder(Long userId, Long orderId, String role) {
+        PurchaseOrder order = purchaseOrderMapper.selectById(orderId);
+        if (order == null) throw new BusinessException(404, "订单不存在");
+        if ("CUSTOMER".equals(role) && !order.getCustomerId().equals(userId)) {
+            throw new BusinessException(403, "无权操作此订单");
+        }
+        order.setStatus("CANCELLED");
+        purchaseOrderMapper.updateById(order);
+    }
+
+    @Override
+    public PageResult<PurchaseOrder> listByCustomer(Long customerId, int page, int size) {
+        Page<PurchaseOrder> p = purchaseOrderMapper.selectPage(new Page<>(page, size),
+            new LambdaQueryWrapper<PurchaseOrder>().eq(PurchaseOrder::getCustomerId, customerId));
+        return PageResult.of(p.getRecords(), page, size, p.getTotal());
+    }
+
+    @Override
+    public PageResult<PurchaseOrder> listByCompany(Long companyId, int page, int size) {
+        Page<PurchaseOrder> p = purchaseOrderMapper.selectPage(new Page<>(page, size),
+            new LambdaQueryWrapper<PurchaseOrder>() /* 需关联 property 表查 companyId */);
+        return PageResult.of(p.getRecords(), page, size, p.getTotal());
+    }
+
+    private String generateOrderNo() {
+        return "ORD" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+            + ThreadLocalRandom.current().nextInt(1000, 9999);
+    }
+}
+```
+
+- [ ] **Step 4 (VERIFY GREEN): 确认测试通过**
+
+Run: `cd fangdichan-server && mvn test -Dtest=PurchaseOrderServiceImplTest -q`
+Expected: BUILD SUCCESS，5 个测试全部通过
+
+- [ ] **Step 5 (REFACTOR): 创建 Controller**
+
+CustomerOrderController: POST /api/customer/order (创建), GET list (分页), PUT cancel
+AgentOrderController: GET /api/agent/order/list, PUT confirm, PUT cancel
+
+- [ ] **Step 6: 编译验证 + 全量测试**
+
+Run: `cd fangdichan-server && mvn clean test -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 5: 创建测试 + 运行测试**
+- [ ] **Step 7: Commit**
 
-Run: `cd fangdichan-server && mvn test -q`
-Expected: BUILD SUCCESS
-
-- [ ] **Step 6: Commit**
+```bash
+git add fangdichan-server/src/main/java/com/fdsc/module/order/ \
+        fangdichan-server/src/test/java/com/fdsc/module/order/
+git commit -m "feat: add purchase order module (TDD)"
+```
 
 ---
 
 ### Task 11: 收藏 & 建议 & 举报模块
 
+**TDD Flow:** 三个子模块各自 RED → GREEN → REFACTOR
+
 **Files:**
+- `fangdichan-server/src/main/java/com/fdsc/module/favorite/` (entity, mapper, service, controller)
+- `fangdichan-server/src/main/java/com/fdsc/module/suggestion/` (entity, mapper, service, controller)
+- `fangdichan-server/src/main/java/com/fdsc/module/report/` (entity, mapper, service, controller)
 
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/favorite/` (entity, mapper, service, controller)
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/suggestion/` (entity, mapper, service, controller)
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/report/` (entity, mapper, service, controller)
+#### 子任务 11.1: 收藏模块
 
-- [ ] **Step 1: 收藏模块**
+- [ ] **Step 1 (RED): 创建实体、Mapper 和测试**
 
 ```java
-@RestController
-@RequestMapping("/api/customer/favorite")
-public class CustomerFavoriteController {
-    // POST /api/customer/favorite/{propertyId} - 收藏
-    // DELETE /api/customer/favorite/{propertyId} - 取消收藏
-    // GET /api/customer/favorite/list - 收藏列表（分页）
+// Favorite.java
+@Data
+@TableName("favorite")
+public class Favorite {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long customerId;
+    private Long propertyId;
+    private LocalDateTime createdAt;
 }
 ```
 
-Favorite 实体：id, customerId, propertyId, createdAt
-FavoriteMapper：BaseMapper
-Service：toggleFavorite（不存在则添加，存在则删除）、listByCustomer
-
-- [ ] **Step 2: 建议模块**
+```java
+// FavoriteMapper.java
+@Mapper
+public interface FavoriteMapper extends BaseMapper<Favorite> {}
+```
 
 ```java
-@RestController
-@RequestMapping("/api/customer/suggestion")
-public class CustomerSuggestionController {
-    // POST /api/customer/suggestion - 提交建议
-    // GET /api/customer/suggestion/list - 查看自己的建议
-}
-
-@RestController
-@RequestMapping("/api/agent/suggestion")
-public class AgentSuggestionController {
-    // GET /api/agent/suggestion/list - 查看客户对自己的建议
+// FavoriteService.java
+public interface FavoriteService {
+    boolean toggleFavorite(Long customerId, Long propertyId);
+    PageResult<Property> listByCustomer(Long customerId, int page, int size);
 }
 ```
 
-Suggestion 实体：id, customerId, companyId, desiredType, desiredPriceMin, desiredPriceMax, content, createdAt
-Service：create、listByCustomer、listByCompany
-
-- [ ] **Step 3: 举报模块**
-
 ```java
-@RestController
-@RequestMapping("/api/customer/report")
-public class CustomerReportController {
-    // POST /api/customer/report - 举报房源
-}
+// FavoriteServiceImplTest.java
+@ExtendWith(MockitoExtension.class)
+class FavoriteServiceImplTest {
+    @Mock private FavoriteMapper favoriteMapper;
+    private FavoriteServiceImpl favoriteService;
 
-@RestController
-@RequestMapping("/api/admin/report")
-public class AdminReportController {
-    // GET /api/admin/report/pending - 待处理列表
-    // PUT /api/admin/report/{id}/dismiss - 驳回
-    // PUT /api/admin/report/{id}/process - 处理(下架房源)
+    @BeforeEach
+    void setUp() { favoriteService = new FavoriteServiceImpl(favoriteMapper); }
+
+    @Test
+    void toggleFavorite_shouldAddWhenNotExists() {
+        when(favoriteMapper.selectOne(any())).thenReturn(null);
+        boolean result = favoriteService.toggleFavorite(1L, 1L);
+        assertTrue(result);
+        verify(favoriteMapper).insert(any());
+    }
+
+    @Test
+    void toggleFavorite_shouldRemoveWhenExists() {
+        when(favoriteMapper.selectOne(any())).thenReturn(new Favorite());
+        boolean result = favoriteService.toggleFavorite(1L, 1L);
+        assertFalse(result);
+        verify(favoriteMapper).delete(any());
+    }
 }
 ```
 
-Report 实体：id, propertyId, customerId, reason, status, createdAt, updatedAt
+- [ ] **Step 2 (VERIFY RED)**
 
-- [ ] **Step 4: 编译验证**
+Run: `cd fangdichan-server && mvn test -Dtest=FavoriteServiceImplTest -q`
+Expected: 编译失败
 
-Run: `cd fangdichan-server && mvn clean compile -q`
+- [ ] **Step 3 (GREEN): 实现 + 验证**
+
+```java
+@Service
+@RequiredArgsConstructor
+public class FavoriteServiceImpl implements FavoriteService {
+    private final FavoriteMapper favoriteMapper;
+
+    @Override
+    public boolean toggleFavorite(Long customerId, Long propertyId) {
+        Favorite existing = favoriteMapper.selectOne(
+            new LambdaQueryWrapper<Favorite>()
+                .eq(Favorite::getCustomerId, customerId)
+                .eq(Favorite::getPropertyId, propertyId));
+        if (existing != null) {
+            favoriteMapper.delete(new LambdaQueryWrapper<Favorite>()
+                .eq(Favorite::getId, existing.getId()));
+            return false; // 已取消收藏
+        }
+        Favorite fav = new Favorite();
+        fav.setCustomerId(customerId);
+        fav.setPropertyId(propertyId);
+        favoriteMapper.insert(fav);
+        return true; // 新增收藏
+    }
+}
+```
+
+Run: `cd fangdichan-server && mvn test -Dtest=FavoriteServiceImplTest -q`
+Expected: PASS
+
+#### 子任务 11.2: 建议模块
+
+- [ ] **Step 4 (RED→GREEN): 建议模块测试优先**
+
+```java
+// SuggestionServiceImplTest.java
+@ExtendWith(MockitoExtension.class)
+class SuggestionServiceImplTest {
+    @Mock private SuggestionMapper suggestionMapper;
+    private SuggestionServiceImpl suggestionService;
+
+    @BeforeEach
+    void setUp() { suggestionService = new SuggestionServiceImpl(suggestionMapper); }
+
+    @Test
+    void create_shouldInsert() {
+        suggestionService.create(1L, 1L, "三室", null, null, "求购");
+        verify(suggestionMapper).insert(any());
+    }
+
+    @Test
+    void listByCustomer_shouldReturnList() {
+        when(suggestionMapper.selectPage(any(), any())).thenReturn(new Page<>());
+        assertNotNull(suggestionService.listByCustomer(1L, 1, 10));
+    }
+}
+```
+
+实现 Suggestion 实体（id, customerId, companyId, desiredType, desiredPriceMin, desiredPriceMax, content, createdAt）和 SuggestionMapper、SuggestionService。
+
+#### 子任务 11.3: 举报模块
+
+- [ ] **Step 5 (RED→GREEN): 举报模块测试优先**
+
+```java
+// ReportServiceImplTest.java
+@ExtendWith(MockitoExtension.class)
+class ReportServiceImplTest {
+    @Mock private ReportMapper reportMapper;
+    @Mock private PropertyMapper propertyMapper;
+    private ReportServiceImpl reportService;
+
+    @BeforeEach
+    void setUp() { reportService = new ReportServiceImpl(reportMapper, propertyMapper); }
+
+    @Test
+    void createReport_shouldInsertWithPending() {
+        reportService.createReport(1L, 1L, "虚假信息");
+        verify(reportMapper).insert(any());
+    }
+
+    @Test
+    void processReport_shouldSetProcessedAndOffMarket() {
+        Report report = new Report();
+        report.setPropertyId(1L);
+        when(reportMapper.selectById(1L)).thenReturn(report);
+        when(propertyMapper.selectById(1L)).thenReturn(new Property());
+
+        reportService.processReport(1L);
+        assertEquals("PROCESSED", report.getStatus());
+    }
+}
+```
+
+- [ ] **Step 6: 编译验证 + 全量测试**
+
+Run: `cd fangdichan-server && mvn clean test -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 5: 创建测试 + 运行测试**
+- [ ] **Step 7: Commit**
 
-Run: `cd fangdichan-server && mvn test -q`
-Expected: BUILD SUCCESS
-
-- [ ] **Step 6: Commit**
+```bash
+git add fangdichan-server/src/main/java/com/fdsc/module/favorite/ \
+        fangdichan-server/src/main/java/com/fdsc/module/suggestion/ \
+        fangdichan-server/src/main/java/com/fdsc/module/report/ \
+        fangdichan-server/src/test/java/com/fdsc/module/favorite/ \
+        fangdichan-server/src/test/java/com/fdsc/module/suggestion/ \
+        fangdichan-server/src/test/java/com/fdsc/module/report/
+git commit -m "feat: add favorite, suggestion, report modules (TDD)"
+```
 
 ---
 
 ### Task 12: 消息模块 + WebSocket
 
-**Files:**
+**TDD Flow:** RED (MessageService) → GREEN → REFACTOR (WebSocket + Controller)
 
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/message/entity/Conversation.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/message/entity/Message.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/message/mapper/ConversationMapper.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/message/mapper/MessageMapper.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/message/service/MessageService.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/message/service/impl/MessageServiceImpl.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/message/controller/CustomerMessageController.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/message/controller/AgentMessageController.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/common/config/WebSocketConfig.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/security/WebSocketAuthInterceptor.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/websocket/MessageWebSocketHandler.java`
+**Files to create (in TDD order):**
+- Entity: Conversation.java, Message.java
+- Mapper: ConversationMapper.java, MessageMapper.java
+- Service/Impl + Test
+- WebSocketConfig.java, WebSocketAuthInterceptor.java, MessageWebSocketHandler.java
 
-- [ ] **Step 1: 创建实体 + Mapper**
-- [ ] **Step 2: 创建 WebSocket 配置**
+- [ ] **Step 1 (RED): 创建实体、Mapper 和 Service 测试**
 
 ```java
-@Configuration
-@EnableWebSocket
-public class WebSocketConfig implements WebSocketConfigurer {
-    @Override
-    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(messageHandler(), "/ws")
-                .addInterceptors(webSocketAuthInterceptor())
-                .setAllowedOrigins("*");
-    }
+// Conversation.java
+@Data @TableName("conversation")
+public class Conversation {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long customerId;
+    private Long companyId;
+    private Long propertyId;
+    private String status;
+    private Integer customerUnread;
+    private Integer agentUnread;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+
+// Message.java
+@Data @TableName("message")
+public class Message {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    private Long conversationId;
+    private Long senderId;
+    private String senderRole;
+    private String content;
+    private LocalDateTime createdAt;
 }
 ```
 
-- [ ] **Step 3: 创建 WebSocket 认证拦截器**
-
 ```java
-@Component
-public class WebSocketAuthInterceptor implements HandshakeInterceptor {
-    private final JwtTokenProvider jwtTokenProvider;
-
-    @Override
-    public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
-                                    WebSocketHandler wsHandler, Map<String, Object> attributes) {
-        String query = request.getURI().getQuery();
-        String token = extractTokenFromQuery(query);
-        if (token != null && jwtTokenProvider.validateToken(token)) {
-            attributes.put("userId", jwtTokenProvider.getUserIdFromToken(token));
-            attributes.put("role", jwtTokenProvider.getRoleFromToken(token));
-            return true;
-        }
-        return false;
-    }
-}
-```
-
-- [ ] **Step 4: 创建 MessageWebSocketHandler**
-
-```java
-@Component
-public class MessageWebSocketHandler extends TextWebSocketHandler {
-    // 管理在线用户连接: ConcurrentHashMap<Long, WebSocketSession>
-    // afterConnectionEstablished: 用户上线，存入 map
-    // handleTextMessage: 接收消息，保存到数据库，推送给接收方
-    // afterConnectionClosed: 用户离线，从 map 移除
-}
-```
-
-- [ ] **Step 5: 创建 MessageService**
-
-```java
+// MessageService.java
 public interface MessageService {
     Conversation createConversation(Long customerId, Long companyId, Long propertyId);
     void sendMessage(Long conversationId, Long senderId, String senderRole, String content);
@@ -2093,37 +2997,155 @@ public interface MessageService {
 }
 ```
 
-发送消息流程：保存 message → 递增 conversation 中接收方的 unread 计数 → 通过 WebSocket 推送给接收方 → 接收方阅读消息时将对应 unread 字段清零。
+```java
+// MessageServiceImplTest.java
+@ExtendWith(MockitoExtension.class)
+class MessageServiceImplTest {
+    @Mock private ConversationMapper conversationMapper;
+    @Mock private MessageMapper messageMapper;
+    private MessageServiceImpl messageService;
 
-listConversations 返回时附带各会话的未读计数。
+    @BeforeEach
+    void setUp() { messageService = new MessageServiceImpl(conversationMapper, messageMapper); }
 
-- [ ] **Step 6: 创建客户和房地产商的 Controller**
-- [ ] **Step 7: 编译验证**
+    @Test
+    void createConversation_shouldInsert() {
+        messageService.createConversation(1L, 1L, 1L);
+        verify(conversationMapper).insert(any());
+    }
 
-Run: `cd fangdichan-server && mvn clean compile -q`
+    @Test
+    void sendMessage_shouldInsertAndUpdateUnread() {
+        Conversation conv = new Conversation();
+        conv.setId(1L);
+        when(conversationMapper.selectById(1L)).thenReturn(conv);
+
+        messageService.sendMessage(1L, 1L, "CUSTOMER", "你好");
+        verify(messageMapper).insert(any());
+        verify(conversationMapper).updateById(any());
+    }
+
+    @Test
+    void getMessages_shouldReturnList() {
+        when(messageMapper.selectPage(any(), any())).thenReturn(new Page<>());
+        assertNotNull(messageService.getMessages(1L, 1, 20));
+    }
+
+    @Test
+    void listConversations_shouldReturnForCustomer() {
+        when(conversationMapper.selectList(any())).thenReturn(List.of(new Conversation()));
+        assertEquals(1, messageService.listConversations(1L, "CUSTOMER").size());
+    }
+}
+```
+
+- [ ] **Step 2 (VERIFY RED)**
+
+Run: `cd fangdichan-server && mvn test -Dtest=MessageServiceImplTest -q`
+Expected: 编译失败
+
+- [ ] **Step 3 (GREEN): 实现 MessageServiceImpl**
+
+```java
+@Service
+@RequiredArgsConstructor
+public class MessageServiceImpl implements MessageService {
+    private final ConversationMapper conversationMapper;
+    private final MessageMapper messageMapper;
+
+    @Override
+    public Conversation createConversation(Long customerId, Long companyId, Long propertyId) {
+        Conversation conv = new Conversation();
+        conv.setCustomerId(customerId);
+        conv.setCompanyId(companyId);
+        conv.setPropertyId(propertyId);
+        conv.setStatus("OPEN");
+        conv.setCustomerUnread(0);
+        conv.setAgentUnread(0);
+        conversationMapper.insert(conv);
+        return conv;
+    }
+
+    @Override
+    public void sendMessage(Long conversationId, Long senderId, String senderRole, String content) {
+        Conversation conv = conversationMapper.selectById(conversationId);
+        if (conv == null) throw new BusinessException(404, "会话不存在");
+
+        Message msg = new Message();
+        msg.setConversationId(conversationId);
+        msg.setSenderId(senderId);
+        msg.setSenderRole(senderRole);
+        msg.setContent(content);
+        messageMapper.insert(msg);
+
+        if ("CUSTOMER".equals(senderRole)) {
+            conv.setAgentUnread(conv.getAgentUnread() + 1);
+        } else {
+            conv.setCustomerUnread(conv.getCustomerUnread() + 1);
+        }
+        conversationMapper.updateById(conv);
+    }
+
+    @Override
+    public List<Message> getMessages(Long conversationId, int page, int size) {
+        Page<Message> p = messageMapper.selectPage(new Page<>(page, size),
+            new LambdaQueryWrapper<Message>().eq(Message::getConversationId, conversationId)
+                .orderByAsc(Message::getCreatedAt));
+        return p.getRecords();
+    }
+
+    @Override
+    public List<Conversation> listConversations(Long userId, String role) {
+        LambdaQueryWrapper<Conversation> qw = new LambdaQueryWrapper<>();
+        if ("CUSTOMER".equals(role)) qw.eq(Conversation::getCustomerId, userId);
+        else qw.eq(Conversation::getCompanyId, userId);
+        return conversationMapper.selectList(qw.orderByDesc(Conversation::getUpdatedAt));
+    }
+}
+```
+
+- [ ] **Step 4 (VERIFY GREEN)**
+
+Run: `cd fangdichan-server && mvn test -Dtest=MessageServiceImplTest -q`
+Expected: PASS
+
+- [ ] **Step 5 (REFACTOR): 创建 WebSocket 配置、拦截器和 Handler**
+
+WebSocketConfig 注册 /ws 端点
+WebSocketAuthInterceptor 从 query 取 token 验证
+MessageWebSocketHandler 管理在线连接、转发消息
+
+- [ ] **Step 6: 编译验证 + 全量测试**
+
+Run: `cd fangdichan-server && mvn clean test -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 8: 创建测试 + 运行测试**
+- [ ] **Step 7: Commit**
 
-Run: `cd fangdichan-server && mvn test -q`
-Expected: BUILD SUCCESS
-
-- [ ] **Step 9: Commit**
+```bash
+git add fangdichan-server/src/main/java/com/fdsc/module/message/ \
+        fangdichan-server/src/main/java/com/fdsc/common/config/WebSocketConfig.java \
+        fangdichan-server/src/main/java/com/fdsc/security/WebSocketAuthInterceptor.java \
+        fangdichan-server/src/main/java/com/fdsc/websocket/ \
+        fangdichan-server/src/test/java/com/fdsc/module/message/
+git commit -m "feat: add message module with WebSocket (TDD)"
+```
 
 ---
 
 ### Task 13: 关联分析模块
 
+**TDD Flow:** RED → GREEN → REFACTOR
+
 **Files:**
+- VO: `.../dto/VacancyAnalysisVO.java`
+- Service/Impl + Test
+- Controller
 
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/analysis/controller/AnalysisController.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/analysis/service/AnalysisService.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/analysis/service/impl/AnalysisServiceImpl.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/analysis/dto/VacancyAnalysisVO.java`
-
-- [ ] **Step 1: 创建 VO 类**
+- [ ] **Step 1 (RED): 创建 VO 和测试**
 
 ```java
+// VacancyAnalysisVO.java
 @Data
 public class VacancyAnalysisVO {
     private List<VacancyItem> district;
@@ -2140,120 +3162,286 @@ public class VacancyAnalysisVO {
 }
 ```
 
-- [ ] **Step 2: 创建 AnalysisService**
-
 ```java
-public interface AnalysisService {
-    VacancyAnalysisVO getVacancyAnalysis(Long companyId);
-}
-```
+// AnalysisServiceImplTest.java
+@ExtendWith(MockitoExtension.class)
+class AnalysisServiceImplTest {
+    @Mock private PropertyMapper propertyMapper;
+    private AnalysisServiceImpl analysisService;
 
-实现中用 MyBatis-Plus 的 LambdaQueryWrapper 按 district/floor/roomType 分组统计：
+    @BeforeEach
+    void setUp() { analysisService = new AnalysisServiceImpl(propertyMapper); }
 
-```java
-// 按区域统计
-List<Map<String, Object>> districtStats = propertyMapper.selectMaps(
-    new QueryWrapper<Property>()
-        .eq("company_id", companyId)
-        .eq("status", "APPROVED")
-        .select("district, COUNT(*) as total, SUM(CASE WHEN is_vacant = 1 THEN 1 ELSE 0 END) as vacant")
-        .groupBy("district")
-);
-```
+    @Test
+    void getVacancyAnalysis_shouldReturnGroupedData() {
+        when(propertyMapper.selectMaps(any())).thenReturn(List.of(
+            new java.util.HashMap<>(Map.of("name", "朝阳区", "total", 10L, "vacant", 3L)),
+            new java.util.HashMap<>(Map.of("name", "海淀区", "total", 20L, "vacant", 5L))
+        ));
 
-- [ ] **Step 3: 创建 AnalysisController**
-
-```java
-@RestController
-@RequestMapping("/api/agent/analysis")
-public class AnalysisController {
-    @GetMapping("/vacancy")
-    public Result<VacancyAnalysisVO> getVacancyAnalysis(@AuthenticationPrincipal Long userId) {
-        // 通过 userId 找到 companyId，然后返回分析数据
+        VacancyAnalysisVO result = analysisService.getVacancyAnalysis(1L);
+        assertNotNull(result);
+        // selectMaps 在 mock 中返回可控数据
+        verify(propertyMapper, atLeast(3)).selectMaps(any());
     }
 }
 ```
 
-- [ ] **Step 4: 编译验证**
+- [ ] **Step 2 (VERIFY RED)**
 
-Run: `cd fangdichan-server && mvn clean compile -q`
+Run: `cd fangdichan-server && mvn test -Dtest=AnalysisServiceImplTest -q`
+Expected: 编译失败
+
+- [ ] **Step 3 (GREEN): 实现 AnalysisServiceImpl**
+
+```java
+@Service
+@RequiredArgsConstructor
+public class AnalysisServiceImpl implements AnalysisService {
+    private final PropertyMapper propertyMapper;
+
+    @Override
+    public VacancyAnalysisVO getVacancyAnalysis(Long companyId) {
+        VacancyAnalysisVO vo = new VacancyAnalysisVO();
+        vo.setDistrict(buildVacancyItems(companyId, "district"));
+        vo.setFloor(buildVacancyItems(companyId, "floor"));
+        vo.setRoomType(buildVacancyItems(companyId, "room_type"));
+        return vo;
+    }
+
+    private List<VacancyAnalysisVO.VacancyItem> buildVacancyItems(Long companyId, String groupColumn) {
+        List<Map<String, Object>> stats = propertyMapper.selectMaps(
+            new QueryWrapper<Property>()
+                .eq("company_id", companyId)
+                .eq("status", "APPROVED")
+                .select(groupColumn + " as name",
+                    "COUNT(*) as total",
+                    "SUM(CASE WHEN is_vacant = 1 THEN 1 ELSE 0 END) as vacant")
+                .groupBy(groupColumn));
+        return stats.stream().map(m -> {
+            VacancyAnalysisVO.VacancyItem item = new VacancyAnalysisVO.VacancyItem();
+            item.setName((String) m.get("name"));
+            item.setTotal(((Number) m.get("total")).longValue());
+            item.setVacant(((Number) m.get("vacant")).longValue());
+            item.setVacancyRate(item.getTotal() > 0
+                ? (double) item.getVacant() / item.getTotal() * 100 : 0);
+            return item;
+        }).collect(Collectors.toList());
+    }
+}
+```
+
+- [ ] **Step 4 (VERIFY GREEN)**
+
+Run: `cd fangdichan-server && mvn test -Dtest=AnalysisServiceImplTest -q`
+Expected: PASS
+
+- [ ] **Step 5 (REFACTOR): 创建 Controller**
+
+```java
+@RestController
+@RequestMapping("/api/agent/analysis")
+@RequiredArgsConstructor
+public class AnalysisController {
+    private final AnalysisService analysisService;
+    private final CompanyService companyService;
+
+    @GetMapping("/vacancy")
+    public Result<VacancyAnalysisVO> getVacancyAnalysis(@AuthenticationPrincipal Long userId) {
+        Company company = companyService.getCompanyByUserId(userId);
+        return Result.success(analysisService.getVacancyAnalysis(company.getId()));
+    }
+}
+```
+
+- [ ] **Step 6: 编译验证 + 全量测试**
+
+Run: `cd fangdichan-server && mvn clean test -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 5: 创建测试 + 运行测试**
+- [ ] **Step 7: Commit**
 
-Run: `cd fangdichan-server && mvn test -q`
-Expected: BUILD SUCCESS
-
-- [ ] **Step 6: Commit**
+```bash
+git add fangdichan-server/src/main/java/com/fdsc/module/analysis/ \
+        fangdichan-server/src/test/java/com/fdsc/module/analysis/
+git commit -m "feat: add vacancy analysis module (TDD)"
+```
 
 ---
 
 ### Task 14: 报表导出模块
 
+**TDD Flow:** RED → GREEN → REFACTOR
+
 **Files:**
+- `fangdichan-server/src/main/java/com/fdsc/module/report/service/ReportService.java`
+- `fangdichan-server/src/main/java/com/fdsc/module/report/service/impl/ReportServiceImpl.java`
+- `fangdichan-server/src/main/java/com/fdsc/module/report/controller/ReportController.java`
 
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/report/controller/ReportController.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/report/service/ReportService.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/report/service/impl/ReportServiceImpl.java`
-
-- [ ] **Step 1: 创建报表服务**
+- [ ] **Step 1 (RED): 写测试（POI 导出的 byte[] 非空验证）**
 
 ```java
-public interface ReportService {
-    byte[] exportPropertyList(Long companyId, String district, String roomType);
-    byte[] exportAnalysisReport(Long companyId);
+// ReportServiceImplTest.java
+@ExtendWith(MockitoExtension.class)
+class ReportServiceImplTest {
+    @Mock private PropertyMapper propertyMapper;
+    private ReportServiceImpl reportService;
+
+    @BeforeEach
+    void setUp() { reportService = new ReportServiceImpl(propertyMapper); }
+
+    @Test
+    void exportPropertyList_shouldReturnNonEmptyExcel() {
+        when(propertyMapper.selectList(any())).thenReturn(List.of(
+            new Property() {{ setTitle("房源A"); setPrice(new BigDecimal("100")); setStatus("APPROVED"); }},
+            new Property() {{ setTitle("房源B"); setPrice(new BigDecimal("200")); setStatus("APPROVED"); }}
+        ));
+
+        byte[] data = reportService.exportPropertyList(1L, null, null);
+        assertNotNull(data);
+        assertTrue(data.length > 0);
+        // 验证 Excel 魔数
+        assertArrayEquals(new byte[]{0x50, 0x4B, 0x03, 0x04},
+            java.util.Arrays.copyOf(data, 4));
+    }
+
+    @Test
+    void exportAnalysisReport_shouldReturnNonEmptyExcel() {
+        when(propertyMapper.selectMaps(any())).thenReturn(List.of());
+        byte[] data = reportService.exportAnalysisReport(1L);
+        assertNotNull(data);
+        assertTrue(data.length > 0);
+    }
 }
 ```
 
-使用 Apache POI 创建 Excel：创建 Workbook → 创建 Sheet → 创建 Row/Cell → 写入数据 → 转为 byte[]
+- [ ] **Step 2 (VERIFY RED)**
 
-- [ ] **Step 2: 创建 Controller**
+Run: `cd fangdichan-server && mvn test -Dtest=ReportServiceImplTest -q`
+Expected: 编译失败
+
+- [ ] **Step 3 (GREEN): 实现 ReportServiceImpl**
+
+```java
+@Service
+@RequiredArgsConstructor
+public class ReportServiceImpl implements ReportService {
+    private final PropertyMapper propertyMapper;
+
+    @Override
+    public byte[] exportPropertyList(Long companyId, String district, String roomType) {
+        LambdaQueryWrapper<Property> qw = new LambdaQueryWrapper<Property>()
+            .eq(Property::getCompanyId, companyId);
+        if (district != null) qw.eq(Property::getDistrict, district);
+        if (roomType != null) qw.eq(Property::getRoomType, roomType);
+
+        List<Property> list = propertyMapper.selectList(qw);
+
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet sheet = wb.createSheet("房源列表");
+            Row header = sheet.createRow(0);
+            String[] cols = {"标题", "区域", "户型", "面积", "价格", "状态"};
+            for (int i = 0; i < cols.length; i++) header.createCell(i).setCellValue(cols[i]);
+
+            int rowIdx = 1;
+            for (Property p : list) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(p.getTitle());
+                row.createCell(1).setCellValue(p.getDistrict());
+                row.createCell(2).setCellValue(p.getRoomType());
+                row.createCell(3).setCellValue(p.getArea() != null ? p.getArea().doubleValue() : 0);
+                row.createCell(4).setCellValue(p.getPrice() != null ? p.getPrice().doubleValue() : 0);
+                row.createCell(5).setCellValue(p.getStatus());
+            }
+
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            wb.write(bos);
+            return bos.toByteArray();
+        } catch (Exception e) {
+            throw new BusinessException(500, "导出失败");
+        }
+    }
+
+    @Override
+    public byte[] exportAnalysisReport(Long companyId) {
+        // 简化的分析报表
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet sheet = wb.createSheet("关联分析");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("维度");
+            header.createCell(1).setCellValue("名称");
+            header.createCell(2).setCellValue("总数");
+            header.createCell(3).setCellValue("空置数");
+            header.createCell(4).setCellValue("空置率(%)");
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            wb.write(bos);
+            return bos.toByteArray();
+        } catch (Exception e) {
+            throw new BusinessException(500, "导出失败");
+        }
+    }
+}
+```
+
+- [ ] **Step 4 (VERIFY GREEN)**
+
+Run: `cd fangdichan-server && mvn test -Dtest=ReportServiceImplTest -q`
+Expected: PASS
+
+- [ ] **Step 5 (REFACTOR): 创建 Controller**
 
 ```java
 @RestController
 @RequestMapping("/api/agent/report")
+@RequiredArgsConstructor
 public class ReportController {
+    private final ReportService reportService;
+
     @GetMapping("/property-export")
-    public ResponseEntity<byte[]> exportPropertyList(...) {
-        byte[] data = reportService.exportPropertyList(...);
+    public ResponseEntity<byte[]> exportPropertyList(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String roomType) {
+        Company company = companyService.getCompanyByUserId(userId);
+        byte[] data = reportService.exportPropertyList(company.getId(), district, roomType);
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=房源报表.xlsx")
             .contentType(MediaType.APPLICATION_OCTET_STREAM)
             .body(data);
     }
 }
-}
 ```
 
-- [ ] **Step 3: 编译验证**
+- [ ] **Step 6: 编译验证 + 全量测试**
 
-Run: `cd fangdichan-server && mvn clean compile -q`
+Run: `cd fangdichan-server && mvn clean test -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 4: 创建测试 + 运行测试**
+- [ ] **Step 7: Commit**
 
-Run: `cd fangdichan-server && mvn test -q`
-Expected: BUILD SUCCESS
-
-- [ ] **Step 5: Commit**
+```bash
+git add fangdichan-server/src/main/java/com/fdsc/module/report/ \
+        fangdichan-server/src/test/java/com/fdsc/module/report/
+git commit -m "feat: add report export module with POI (TDD)"
+```
 
 ---
 
 ### Task 15: 系统配置模块（管理员）
 
+**TDD Flow:** RED → GREEN → REFACTOR
+
 **Files:**
+- Entity: `.../entity/SystemConfig.java`
+- Mapper: `.../mapper/SystemConfigMapper.java`
+- Service/Impl + Test
+- Controller
 
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/config/entity/SystemConfig.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/config/mapper/SystemConfigMapper.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/config/service/SystemConfigService.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/config/service/impl/SystemConfigServiceImpl.java`
-- Create: `fangdichan-server/src/main/java/com/fdsc/module/config/controller/SystemConfigController.java`
-
-- [ ] **Step 1: 创建实体 + Mapper**
+- [ ] **Step 1 (RED): 创建实体、Mapper 和测试**
 
 ```java
-@Data
-@TableName("system_config")
+// SystemConfig.java
+@Data @TableName("system_config")
 public class SystemConfig {
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -2264,38 +3452,144 @@ public class SystemConfig {
 }
 ```
 
-- [ ] **Step 2: 创建 Service**
+```java
+// SystemConfigMapper.java
+@Mapper
+public interface SystemConfigMapper extends BaseMapper<SystemConfig> {}
+```
 
 ```java
-public interface SystemConfigService {
-    String getConfig(String key);
-    void setConfig(String key, String value, String description);
-    List<SystemConfig> listAll();
+// SystemConfigServiceImplTest.java
+@ExtendWith(MockitoExtension.class)
+class SystemConfigServiceImplTest {
+    @Mock private SystemConfigMapper systemConfigMapper;
+    private SystemConfigServiceImpl systemConfigService;
+
+    @BeforeEach
+    void setUp() { systemConfigService = new SystemConfigServiceImpl(systemConfigMapper); }
+
+    @Test
+    void getConfig_shouldReturnValue() {
+        SystemConfig cfg = new SystemConfig();
+        cfg.setConfigValue("test-value");
+        when(systemConfigMapper.selectOne(any())).thenReturn(cfg);
+        assertEquals("test-value", systemConfigService.getConfig("test-key"));
+    }
+
+    @Test
+    void getConfig_shouldReturnNullWhenNotFound() {
+        when(systemConfigMapper.selectOne(any())).thenReturn(null);
+        assertNull(systemConfigService.getConfig("not-exist"));
+    }
+
+    @Test
+    void setConfig_shouldInsertWhenNew() {
+        when(systemConfigMapper.selectOne(any())).thenReturn(null);
+        systemConfigService.setConfig("new-key", "new-value", "描述");
+        verify(systemConfigMapper).insert(any());
+    }
+
+    @Test
+    void setConfig_shouldUpdateWhenExists() {
+        SystemConfig existing = new SystemConfig();
+        existing.setId(1L);
+        when(systemConfigMapper.selectOne(any())).thenReturn(existing);
+        systemConfigService.setConfig("key", "updated", "新描述");
+        verify(systemConfigMapper).updateById(any());
+    }
+
+    @Test
+    void listAll_shouldReturnList() {
+        when(systemConfigMapper.selectList(any())).thenReturn(List.of(new SystemConfig()));
+        assertEquals(1, systemConfigService.listAll().size());
+    }
 }
 ```
 
-- [ ] **Step 3: 创建 Controller**
+- [ ] **Step 2 (VERIFY RED)**
+
+Run: `cd fangdichan-server && mvn test -Dtest=SystemConfigServiceImplTest -q`
+Expected: 编译失败
+
+- [ ] **Step 3 (GREEN): 创建 SystemConfigServiceImpl**
+
+```java
+@Service
+@RequiredArgsConstructor
+public class SystemConfigServiceImpl implements SystemConfigService {
+    private final SystemConfigMapper systemConfigMapper;
+
+    @Override
+    public String getConfig(String key) {
+        SystemConfig cfg = systemConfigMapper.selectOne(
+            new LambdaQueryWrapper<SystemConfig>().eq(SystemConfig::getConfigKey, key));
+        return cfg != null ? cfg.getConfigValue() : null;
+    }
+
+    @Override
+    public void setConfig(String key, String value, String description) {
+        SystemConfig existing = systemConfigMapper.selectOne(
+            new LambdaQueryWrapper<SystemConfig>().eq(SystemConfig::getConfigKey, key));
+        if (existing != null) {
+            existing.setConfigValue(value);
+            if (description != null) existing.setDescription(description);
+            systemConfigMapper.updateById(existing);
+        } else {
+            SystemConfig cfg = new SystemConfig();
+            cfg.setConfigKey(key);
+            cfg.setConfigValue(value);
+            cfg.setDescription(description);
+            systemConfigMapper.insert(cfg);
+        }
+    }
+
+    @Override
+    public List<SystemConfig> listAll() {
+        return systemConfigMapper.selectList(null);
+    }
+}
+```
+
+- [ ] **Step 4 (VERIFY GREEN)**
+
+Run: `cd fangdichan-server && mvn test -Dtest=SystemConfigServiceImplTest -q`
+Expected: PASS
+
+- [ ] **Step 5 (REFACTOR): 创建 Controller**
 
 ```java
 @RestController
 @RequestMapping("/api/admin/config")
+@RequiredArgsConstructor
 public class SystemConfigController {
-    // GET /api/admin/config - 所有配置
-    // PUT /api/admin/config/{key} - 更新配置
+    private final SystemConfigService systemConfigService;
+
+    @GetMapping
+    public Result<List<SystemConfig>> listAll() {
+        return Result.success(systemConfigService.listAll());
+    }
+
+    @PutMapping("/{key}")
+    public Result<?> updateConfig(@PathVariable String key, @RequestParam String value,
+                                   @RequestParam(required = false) String description) {
+        systemConfigService.setConfig(key, value, description);
+        return Result.success(null);
+    }
 }
 ```
 
-- [ ] **Step 4: 编译验证**
+- [ ] **Step 6: 编译验证 + 全量测试**
 
-Run: `cd fangdichan-server && mvn clean compile -q`
+Run: `cd fangdichan-server && mvn clean test -q`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 5: 创建测试 + 运行测试**
+- [ ] **Step 7: Commit**
 
-Run: `cd fangdichan-server && mvn test -q`
-Expected: BUILD SUCCESS
-
-- [ ] **Step 6: Commit**
+```bash
+git add fangdichan-server/src/main/java/com/fdsc/module/config/ \
+        fangdichan-server/src/test/java/com/fdsc/module/config/
+git commit -m "feat: add system config module (TDD)"
+```
 
 ---
 

@@ -205,6 +205,7 @@ export function searchProperties(params) {
 - 在开始任何涉及前后端的任务前，先读取 `docs/api-contract.md`；API 契约变更时同步更新
 - 新增后端 Controller 方法 → 检查前端是否有对应路径的 API 调用
 - 新增前端 API 模块 → 检查后端端点是否存在于预期路径，且响应格式匹配
+- 涉及前后端联调的功能完成后，启动项目验证关键路径可正常走通，再提交代码
 
 ### CLAUDE.md 维护
 

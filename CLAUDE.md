@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+该文档CLAUDE.md中若有不合理，不能满足项目需求，不能实现的内容，可以提出修改建议
+
 房地产房源搜索系统 monorepo：
 - **fangdichan-server** — Spring Boot 3.2（Java 17, MyBatis Plus, Spring Security, JWT, MinIO, MySQL）
 - **fangdichan-client** — Vue 3 桌面端（Vite, 端口 5173）
@@ -7,8 +9,8 @@
 
 ## 业务领域知识
 
-### 筛选字段的数据库实际值
-这些值必须在测试、MSW mock 和前端常量中完全一致。后端使用 `eq()` 精确匹配。
+### 数据库筛选字段实际值
+以下值必须在测试、MSW mock 和前端常量中完全一致。后端使用 `eq()` 精确匹配。
 
 | 字段 | 数据库实际值 | 说明 |
 |------|-------------|------|
@@ -25,17 +27,18 @@
 
 ### 全栈数据链规则
 编写查询接口时，按顺序验证：
-1. 筛选字段的数据库实际值
-2. 后端测试使用与 DB 一致的值
-3. 前端 MSW mock 数据使用相同的值
+1. 确认筛选字段的数据库实际值
+2. 后端测试必须包含超过半数的数据库实际值
+3. 前端 MSW mock 数据必须包含超过半数的数据库实际值
 4. 前端契约测试断言正确的筛选行为
 
 ### API 契约一致性规则
 - 在新增或修改涉及前后端的 API 之前，先读取 `docs/api-contract.md` 了解当前契约
 - 每当 API 路径、参数或响应结构发生变化时，同步更新 `docs/api-contract.md`
-- 后端变更后（新增 Controller 方法、修改响应结构），验证前端有匹配的 API 调用和 MSW handler，且路径和数据格式一致
-- 前端变更后（新增 API 模块、更新 MSW handler），验证后端端点确实存在于预期路径
+- 后端变更后（新增 Controller 方法、修改响应结构），验证前端有匹配的 API 调用和 MSW handler，且路径和数据格式一致，如果不符合预期，则在`docs/api-contract.md`中指出问题
+- 前端变更后（新增 API 模块、更新 MSW handler），验证后端端点确实存在于预期路径，如果不符合预期，则修改前端代码，以求与后端接口对齐
 - 响应结构形状（字符串数组 vs VO 对象、字段名、嵌套层级）必须在后端、MSW mock、前端消费方之间完全一致—仅路径一致不够
+- 当新增修改代码后发现本次修改导致项目与`docs/api-contract.md`的描述不一致时，需要在`docs/api-contract.md`中声明并给出修改建议
 
 ### 选项/下拉框
 - 优先使用 dict API（`/api/public/dict/districts`、`/api/public/dict/room-types`）而非硬编码常量

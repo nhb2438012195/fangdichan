@@ -1,89 +1,89 @@
 # CLAUDE.md
 
-Monorepo for a real estate property search system:
-- **fangdichan-server** — Spring Boot 3.2 (Java 17, MyBatis Plus, Spring Security, JWT, MinIO, MySQL)
-- **fangdichan-client** — Vue 3 desktop client (Vite, port 5173)
-- **fangdichan-admin-web** — Vue 3 admin SPA (Element Plus, port 3000)
+房地产房源搜索系统 monorepo：
+- **fangdichan-server** — Spring Boot 3.2（Java 17, MyBatis Plus, Spring Security, JWT, MinIO, MySQL）
+- **fangdichan-client** — Vue 3 桌面端（Vite, 端口 5173）
+- **fangdichan-admin-web** — Vue 3 管理后台（Element Plus, 端口 3000）
 
-## Business Domain Knowledge
+## 业务领域知识
 
-### Database values for filter fields
-These values must match exactly in tests, MSW mocks, and frontend constants. Backend uses `eq()` for exact match.
+### 筛选字段的数据库实际值
+这些值必须在测试、MSW mock 和前端常量中完全一致。后端使用 `eq()` 精确匹配。
 
-| Field | Actual DB values | Notes |
-|-------|-----------------|-------|
+| 字段 | 数据库实际值 | 说明 |
+|------|-------------|------|
 | `property.room_type` | `一室一厅`, `两室一厅`, `三室一厅`, `三室两厅`, `四室两厅`, `五室两厅` | 前端 constants.js 缺 `三室一厅` 和 `五室两厅` |
 | `property.district` | 来自 regions.json 的完整行政区划（北京各区、上海各区、广州、深圳等） | 搜索用 value 需与 DB `eq()` 精确匹配 |
 | `property.status` | `APPROVED`, `PENDING`, `REJECTED` | 英文大写字符串，非中文 |
 | `purchase_order.status` | `PENDING`, `CONFIRMED` | 订单状态 |
 
-### Search/filter critical rules
-- **district** / **roomType**: `eq()` 精确匹配 — 必须用完整值（`三室两厅`，不是 `三室`）
-- **keyword**: LIKE on `title` + `location`
-- **priceMin/priceMax**, **areaMin/areaMax**: range filter
-- `cleanParams()` strips null/undefined/empty-string/zero before sending
+### 搜索/筛选关键规则
+- **district** / **roomType**：`eq()` 精确匹配—必须用完整值（`三室两厅`，不是 `三室`）
+- **keyword**：LIKE 模糊匹配 `title` + `location`
+- **priceMin/priceMax**、**areaMin/areaMax**：范围筛选
+- `cleanParams()` 发送前会剔除 null/undefined/空字符串/零值
 
-### Full-stack data chain rule
-When writing query interfaces, verify in order:
-1. Actual DB values for filter fields
-2. Backend tests use those real values
-3. Frontend MSW mock data uses same values
-4. Frontend contract tests assert correct filtering behavior
+### 全栈数据链规则
+编写查询接口时，按顺序验证：
+1. 筛选字段的数据库实际值
+2. 后端测试使用与 DB 一致的值
+3. 前端 MSW mock 数据使用相同的值
+4. 前端契约测试断言正确的筛选行为
 
-### API contract consistency rule
-- Before adding or modifying any API that touches both frontend and backend, read `docs/api-contract.md` for the current contract
-- Modify `docs/api-contract.md` whenever API paths, parameters, or response structures change
-- After backend changes (new controller method, modified response structure), verify frontend has a matching API call and MSW handler with identical path and data format
-- After frontend changes (new API module, updated MSW handler), verify the backend endpoint actually exists at the expected path
-- Response structure shape (plain string vs VO object, field names, nesting) must match exactly between backend, MSW mocks, and frontend consumers—path alone is not enough
+### API 契约一致性规则
+- 在新增或修改涉及前后端的 API 之前，先读取 `docs/api-contract.md` 了解当前契约
+- 每当 API 路径、参数或响应结构发生变化时，同步更新 `docs/api-contract.md`
+- 后端变更后（新增 Controller 方法、修改响应结构），验证前端有匹配的 API 调用和 MSW handler，且路径和数据格式一致
+- 前端变更后（新增 API 模块、更新 MSW handler），验证后端端点确实存在于预期路径
+- 响应结构形状（字符串数组 vs VO 对象、字段名、嵌套层级）必须在后端、MSW mock、前端消费方之间完全一致—仅路径一致不够
 
-### Options/dropdowns
-- Prefer dict API (`/api/public/dict/districts`, `/api/public/dict/room-types`) over hardcoded constants
-- `constants.js` is offline fallback — keep synced with DB values
+### 选项/下拉框
+- 优先使用 dict API（`/api/public/dict/districts`、`/api/public/dict/room-types`）而非硬编码常量
+- `constants.js` 是离线 fallback——需与数据库值保持同步
 
-### Property entity computed field
-- `unitPrice` is auto-computed in `Property.java` setters: `setPrice()` and `setArea()` both calculate `unitPrice = price / area` (via `divide(area, 2, RoundingMode.HALF_UP)`)
-- **Service layer manually manages unitPrice during updates**: `updateProperty()` nulls `unitPrice` first, then conditionally recomputes from the incoming price/area. This is intentional — the entity auto-compute is a safety net, but the service needs precise control for partial updates.
-- If adding a new code path that modifies price or area, follow the same pattern: null unitPrice, then recompute if both fields are present and area > 0.
+### Property 实体计算字段
+- `unitPrice` 由 `Property.java` 的 setter 自动计算：`setPrice()` 和 `setArea()` 都会计算 `unitPrice = price / area`（使用 `divide(area, 2, RoundingMode.HALF_UP)`）
+- **Service 层在更新时手动控制 unitPrice**：`updateProperty()` 先将 `unitPrice` 置 null，然后根据传入的 price/area 有条件地重新计算。这是有意为之—实体的自动计算是安全网，但 service 需要对部分更新有精确控制。
+- 如果新增修改 price 或 area 的代码路径，遵循相同模式：先将 unitPrice 置 null，如果 price 和 area 都存在且 area > 0 则重新计算。
 
-## Quick Start
+## 快速开始
 
 ```bash
-npm run lint                                         # Lint both frontends
-npm test                                             # Test both frontends
-cd fangdichan-client && npm run dev                  # Client on :5173
-cd fangdichan-admin-web && npm run dev               # Admin on :3000
+npm run lint                                         # 检查两个前端项目
+npm test                                             # 测试两个前端项目
+cd fangdichan-client && npm run dev                  # 客户端 :5173
+cd fangdichan-admin-web && npm run dev               # 管理后台 :3000
 cd fangdichan-server && ./mvnw spring-boot:run -Dspring.profiles.active=dev
-cd fangdichan-server && ./mvnw test                  # Backend tests (MySQL)
+cd fangdichan-server && ./mvnw test                  # 后端测试（需要 MySQL）
 cd fangdichan-server && ./mvnw validate              # Checkstyle + PMD
-npx vitest run path/to/test.js                       # Single frontend test file
+npx vitest run path/to/test.js                       # 单个前端测试文件
 ```
 
-## Architecture
+## 架构
 
-### API routing (SecurityConfig)
-| Pattern | Access |
-|---------|--------|
-| `/api/public/**` | Open (login, register, dict) |
-| `/api/admin/**` | ADMIN only |
-| `/api/agent/**` | ADMIN or AGENT |
-| `/api/customer/**` | ADMIN or CUSTOMER |
-| `/ws/**` | Open (WebSocket) |
+### API 路由（SecurityConfig）
+| 匹配模式 | 访问权限 |
+|---------|---------|
+| `/api/public/**` | 公开（登录、注册、字典） |
+| `/api/admin/**` | 仅 ADMIN |
+| `/api/agent/**` | ADMIN 或 AGENT |
+| `/api/customer/**` | ADMIN 或 CUSTOMER |
+| `/ws/**` | 公开（WebSocket） |
 
-### Response format
-- Success: `{ code: 200, msg: "success", data: ... }`
-- Paginated: `PageResult` inside `Result.data`: `{ list, page, size, total, pages }`
-- Interceptor chain: axios response → `res.data` (interceptor) → `.then(res => res.data)` (API fn) → `data` field
+### 响应格式
+- 成功：`{ code: 200, msg: "success", data: ... }`
+- 分页：`PageResult` 放在 `Result.data` 内：`{ list, page, size, total, pages }`
+- 拦截器链：axios 响应 → `res.data`（拦截器）→ `.then(res => res.data)`（API 函数）→ `data` 字段
 
-### Backend layering
-`Controller` → `Service`/`ServiceImpl` → `Mapper` (MyBatis Plus) → `Entity`
-- Modules cannot depend on each other at Service level; shared logic goes in `common`
-- New modules follow the 4-layer structure
+### 后端分层
+`Controller` → `Service`/`ServiceImpl` → `Mapper`（MyBatis Plus）→ `Entity`
+- 模块之间不能在 Service 层互相依赖；共享逻辑放在 `common` 中
+- 新模块遵循 4 层结构
 
-### Module inventory
+### 模块清单
 
-| Module | Entity | Mapper | Service | Controller | DTO | Notes |
-|--------|:-:|:-:|:-:|:-:|:-:|-------|
+| 模块 | Entity | Mapper | Service | Controller | DTO | 说明 |
+|------|:-:|:-:|:-:|:-:|:-:|------|
 | `user` | ✓ | ✓ | ✓ | ✓ | ✓ | 用户管理 + 认证 |
 | `company` | ✓ | ✓ | ✓ | ✓ | | 房地产公司 |
 | `property` | ✓ | ✓ | ✓ | ✓ | | 房源 CRUD + 审核 |
@@ -97,51 +97,51 @@ npx vitest run path/to/test.js                       # Single frontend test file
 | `region` | ✓ | ✓ | ✓ | ✓ | ✓ | 区域管理 |
 | `roomtype` | ✓ | ✓ | ✓ | ✓ | ✓ | 房型管理 |
 
-Before adding a new module, check this table to avoid duplicates.
+新增模块前先检查此表，避免重复。
 
-### Business rules
-- Property `status` transitions: `PENDING` → `APPROVED`/`REJECTED` (via ADMIN audit only)
-- Properties have no delete operation — use `setOffMarket()` to take a property off market instead
-- `BusinessException(code, message)` → `GlobalExceptionHandler` → `{ code, msg }` JSON response (business error codes start at 1000)
-- Validation errors (`@Valid`) → `MethodArgumentNotValidException` → `400` with field-level message
+### 业务规则
+- Property `status` 流转：`PENDING` → `APPROVED`/`REJECTED`（仅 ADMIN 审核）
+- 房产不支持删除——使用 `setOffMarket()` 下架代替
+- `BusinessException(code, message)` → `GlobalExceptionHandler` → 返回 `{ code, msg }` JSON（业务错误码从 1000 开始）
+- 校验错误（`@Valid`）→ `MethodArgumentNotValidException` → `400` 状态码，返回字段级错误信息
 
-### Database conventions
-- Table names: lowercase_underscore, PK `id` BIGINT AUTO_INCREMENT
-- Every table: `created_at` / `updated_at`
-- Foreign keys: `xxx_id` with CONSTRAINT
+### 数据库约定
+- 表名：小写下划线，主键 `id` BIGINT AUTO_INCREMENT
+- 每张表：`created_at` / `updated_at`
+- 外键：`xxx_id` 并带 CONSTRAINT
 
-### Error codes
-| Code | Meaning |
-|------|---------|
-| 200 | Success |
-| 400 | Bad request |
-| 401 | Unauthenticated |
-| 403 | Forbidden |
-| 404 | Not found |
-| 500 | Internal error |
-| 1000+ | Business errors |
+### 错误码
+| 状态码 | 含义 |
+|--------|------|
+| 200 | 成功 |
+| 400 | 请求错误 |
+| 401 | 未认证 |
+| 403 | 无权限 |
+| 404 | 未找到 |
+| 500 | 服务器内部错误 |
+| 1000+ | 业务错误 |
 
-## Key Conventions
+## 关键约定
 
-### Frontend API modules
+### 前端 API 模块
 ```js
 export function searchProperties(params) {
   return request.get('/customer/property/search', { params }).then(res => res.data)
 }
 ```
 
-### Vue components
-- `<script setup>`, typed `defineProps` + validator, `defineEmits`
-- State via Pinia (no `provide/inject` for shared state)
-- Always handle three states: loading (`v-loading`), data display, error (`ElMessage.error`)
+### Vue 组件
+- `<script setup>`，类型化的 `defineProps` + 校验器，`defineEmits`
+- 状态管理用 Pinia（不使用 `provide/inject` 共享状态）
+- 始终处理三种状态：加载中（`v-loading`）、数据显示、错误（`ElMessage.error`）
 
-### Auth flow
-Login stores `token`, `role`, `userId`, `username` in Pinia + localStorage. Axios interceptor attaches `Authorization: Bearer {token}`. 401 clears token → redirect `/login`.
+### 认证流程
+登录后存储 `token`、`role`、`userId`、`username` 到 Pinia 和 localStorage。Axios 拦截器自动添加 `Authorization: Bearer {token}`。收到 401 时清除 token 并重定向到 `/login`。
 
-### Frontend routes — fangdichan-client
+### 前端路由 — fangdichan-client
 
-| Path | View | Auth required |
-|------|------|:-------------:|
+| 路径 | 视图 | 需要登录 |
+|------|------|:-------:|
 | `/login` | Login.vue | |
 | `/register` | Register.vue | |
 | `/home` | Home.vue | |
@@ -156,10 +156,10 @@ Login stores `token`, `role`, `userId`, `username` in Pinia + localStorage. Axio
 | `/suggestion` | Suggestion.vue | ✓ |
 | `/report/:propertyId` | ReportForm.vue | ✓ |
 
-### Frontend routes — fangdichan-admin-web
+### 前端路由 — fangdichan-admin-web
 
-| Path | View | Required role |
-|------|------|:-------------:|
+| 路径 | 视图 | 所需角色 |
+|------|------|:--------:|
 | `/login` | Login.vue | |
 | `/register` | Register.vue | |
 | `/dashboard` | Dashboard.vue | |
@@ -173,48 +173,48 @@ Login stores `token`, `role`, `userId`, `username` in Pinia + localStorage. Axio
 | `/message` | MessageView.vue | |
 | `/config` | SystemConfig.vue | ADMIN |
 
-## Testing
+## 测试
 
-- **Backend**: JUnit 5 + MySQL (远程测试库 `182.92.176.70:3306/fangdichan_db`), MyBatis Plus `BaseMapper` integration tests
-  - Config: `src/test/resources/application-test.yml`
-  - Run all: `cd fangdichan-server && ./mvnw test`
-  - Run single: `./mvnw test -Dtest=PropertyIntegrationTest`
-  - ⚠️ Tests require network access to the remote DB; offline runs will fail
-- **Frontend**: Vitest + happy-dom, MSW for API mocking
-  - MSW handlers: `src/mocks/handlers.js`（每个前端项目独立）
-  - Server starts in `test-setup.js`
-  - Element Plus (ElMessage, ElMessageBox) mocked globally in `test-setup.js`
-  - Test files: `src/views/**/__tests__/*.spec.js` or `src/api/__tests__/*.test.js`
-  - Run all: `npm test`
-  - Run single: `npx vitest run path/to/test.js`
+- **后端**：JUnit 5 + MySQL（远程测试库 `182.92.176.70:3306/fangdichan_db`），MyBatis Plus `BaseMapper` 集成测试
+  - 配置：`src/test/resources/application-test.yml`
+  - 运行全部：`cd fangdichan-server && ./mvnw test`
+  - 运行单个：`./mvnw test -Dtest=PropertyIntegrationTest`
+  - ⚠️ 测试需要网络连接远程数据库；离线时无法运行
+- **前端**：Vitest + happy-dom，MSW 模拟 API
+  - MSW handlers：`src/mocks/handlers.js`（每个前端项目独立）
+  - 服务在 `test-setup.js` 中启动
+  - Element Plus（ElMessage、ElMessageBox）在 `test-setup.js` 中全局 mock
+  - 测试文件：`src/views/**/__tests__/*.spec.js` 或 `src/api/__tests__/*.test.js`
+  - 运行全部：`npm test`
+  - 运行单个：`npx vitest run path/to/test.js`
 
-## Commit Convention
+## 提交规范
 
-Follow Conventional Commits: `feat:|fix:|refactor:|test:|docs:|chore:|style:|perf:|ci:`. Enforced by commitlint + husky.
+遵循 Conventional Commits：`feat:|fix:|refactor:|test:|docs:|chore:|style:|perf:|ci:`。由 commitlint + husky 强制执行。
 
-## AI Behavior
+## AI 行为规范
 
-- Prefer editing existing files over creating new ones
-- Follow existing code patterns in the codebase
-- After API contract changes, update frontend tests and MSW mock data synchronously
-- Use `eq()` for exact-match fields in MyBatis Plus queries
-- Always verify test data consistency across backend → mock → frontend
-- Read `docs/api-contract.md` before starting any task touching both frontend and backend; update it when API contracts change
-- New backend controller method → check frontend has a corresponding API call with the same path
-- New frontend API module → check backend endpoint exists at the expected path and response format matches
+- 优先编辑已有文件而非新建文件
+- 遵循代码库中的现有模式
+- API 契约变更后，同步更新前端测试和 MSW mock 数据
+- MyBatis Plus 查询中精确匹配字段使用 `eq()`
+- 始终验证测试数据在 后端 → mock → 前端 之间的一致性
+- 在开始任何涉及前后端的任务前，先读取 `docs/api-contract.md`；API 契约变更时同步更新
+- 新增后端 Controller 方法 → 检查前端是否有对应路径的 API 调用
+- 新增前端 API 模块 → 检查后端端点是否存在于预期路径，且响应格式匹配
 
-### CLAUDE.md maintenance
+### CLAUDE.md 维护
 
-Keep this file in sync with project evolution. Update it when:
+跟随项目演进保持此文件同步。以下情况需要更新：
 
-| Trigger | What to update |
-|---------|----------------|
-| 新增业务模块 | Module inventory 表 + 路由表（如有） |
-| 修改 DB 字段或枚举值 | Database values 表，特别是 filter 字段 |
-| 新增 API 路由模式 | API routing 表 |
-| 产生新的关键业务规则 | Business rules 小节 |
-| 前端新增页面 | Frontend routes 表 |
-| 测试基础设施变动 | Testing 节（如加了 H2 配置能离线跑） |
+| 触发条件 | 更新内容 |
+|---------|---------|
+| 新增业务模块 | 模块清单表 + 路由表（如有） |
+| 修改 DB 字段或枚举值 | 数据库值表，特别是筛选字段 |
+| 新增 API 路由模式 | API 路由表 |
+| 产生新的关键业务规则 | 业务规则小节 |
+| 前端新增页面 | 前端路由表 |
+| 测试基础设施变动 | 测试小节（如加了 H2 配置能离线跑） |
 | 发现文档与实际不符 | 立即修正 |
 
 **不需要更新**：细小的代码变更、修 bug、重构内部实现但不改接口——这些交给 git log。

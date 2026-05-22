@@ -30,14 +30,21 @@ When writing query interfaces, verify in order:
 3. Frontend MSW mock data uses same values
 4. Frontend contract tests assert correct filtering behavior
 
+### API contract consistency rule
+- Before adding or modifying any API that touches both frontend and backend, read `docs/api-contract.md` for the current contract
+- Modify `docs/api-contract.md` whenever API paths, parameters, or response structures change
+- After backend changes (new controller method, modified response structure), verify frontend has a matching API call and MSW handler with identical path and data format
+- After frontend changes (new API module, updated MSW handler), verify the backend endpoint actually exists at the expected path
+- Response structure shape (plain string vs VO object, field names, nesting) must match exactly between backend, MSW mocks, and frontend consumers—path alone is not enough
+
 ### Options/dropdowns
 - Prefer dict API (`/api/public/dict/districts`, `/api/public/dict/room-types`) over hardcoded constants
 - `constants.js` is offline fallback — keep synced with DB values
 
 ### Property entity computed field
-- `unitPrice` is auto-computed in `Property.java`: `setPrice()` and `setArea()` both calculate `unitPrice = price / area` (via `divide(area, 2, RoundingMode.HALF_UP)`)
-- **Do not set `unitPrice` directly** — always set `price` and `area` through the entity setters so the invariant is maintained
-- Direct SQL `UPDATE property SET unit_price = ?` bypasses this logic
+- `unitPrice` is auto-computed in `Property.java` setters: `setPrice()` and `setArea()` both calculate `unitPrice = price / area` (via `divide(area, 2, RoundingMode.HALF_UP)`)
+- **Service layer manually manages unitPrice during updates**: `updateProperty()` nulls `unitPrice` first, then conditionally recomputes from the incoming price/area. This is intentional — the entity auto-compute is a safety net, but the service needs precise control for partial updates.
+- If adding a new code path that modifies price or area, follow the same pattern: null unitPrice, then recompute if both fields are present and area > 0.
 
 ## Quick Start
 
@@ -94,7 +101,7 @@ Before adding a new module, check this table to avoid duplicates.
 
 ### Business rules
 - Property `status` transitions: `PENDING` → `APPROVED`/`REJECTED` (via ADMIN audit only)
-- A property with active orders cannot be deleted (FK constraint)
+- Properties have no delete operation — use `setOffMarket()` to take a property off market instead
 - `BusinessException(code, message)` → `GlobalExceptionHandler` → `{ code, msg }` JSON response (business error codes start at 1000)
 - Validation errors (`@Valid`) → `MethodArgumentNotValidException` → `400` with field-level message
 
@@ -192,3 +199,22 @@ Follow Conventional Commits: `feat:|fix:|refactor:|test:|docs:|chore:|style:|per
 - After API contract changes, update frontend tests and MSW mock data synchronously
 - Use `eq()` for exact-match fields in MyBatis Plus queries
 - Always verify test data consistency across backend → mock → frontend
+- Read `docs/api-contract.md` before starting any task touching both frontend and backend; update it when API contracts change
+- New backend controller method → check frontend has a corresponding API call with the same path
+- New frontend API module → check backend endpoint exists at the expected path and response format matches
+
+### CLAUDE.md maintenance
+
+Keep this file in sync with project evolution. Update it when:
+
+| Trigger | What to update |
+|---------|----------------|
+| 新增业务模块 | Module inventory 表 + 路由表（如有） |
+| 修改 DB 字段或枚举值 | Database values 表，特别是 filter 字段 |
+| 新增 API 路由模式 | API routing 表 |
+| 产生新的关键业务规则 | Business rules 小节 |
+| 前端新增页面 | Frontend routes 表 |
+| 测试基础设施变动 | Testing 节（如加了 H2 配置能离线跑） |
+| 发现文档与实际不符 | 立即修正 |
+
+**不需要更新**：细小的代码变更、修 bug、重构内部实现但不改接口——这些交给 git log。
